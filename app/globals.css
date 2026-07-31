@@ -1,0 +1,192 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  background: #0d1118;
+}
+
+html {
+  overflow-x: clip;
+}
+
+* {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+body {
+  margin: 0;
+  font-family:
+    "SF Pro Text",
+    "SF Pro Display",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(141, 162, 251, 0.12), transparent 360px),
+    radial-gradient(circle at bottom right, rgba(120, 131, 155, 0.08), transparent 320px),
+    linear-gradient(180deg, #0d1118 0%, #111722 48%, #0d121b 100%);
+  color: #f8fafc;
+  min-height: 100vh;
+  overflow-x: clip;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+summary {
+  list-style: none;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+input[type="range"] {
+  accent-color: #8da2fb;
+}
+
+::selection {
+  background: rgba(141, 162, 251, 0.28);
+  color: #f8fafc;
+}
+
+.focus-ring {
+  @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper;
+}
+
+.life-terminal {
+  font-variant-numeric: tabular-nums;
+}
+
+.life-terminal::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.022) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.82), transparent 84%);
+}
+
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  background-color: rgba(148, 163, 184, 0.22);
+}
+
+.page-section {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 1rem;
+}
+
+.life-terminal-calendar {
+  --fc-page-bg-color: #131a25;
+  --fc-neutral-bg-color: #161d29;
+  --fc-border-color: rgba(255, 255, 255, 0.08);
+  --fc-button-bg-color: rgba(255, 255, 255, 0.04);
+  --fc-button-border-color: rgba(255, 255, 255, 0.08);
+  --fc-button-hover-bg-color: rgba(255, 255, 255, 0.08);
+  --fc-button-hover-border-color: rgba(255, 255, 255, 0.12);
+  --fc-button-active-bg-color: rgba(141, 162, 251, 0.18);
+  --fc-button-active-border-color: rgba(141, 162, 251, 0.4);
+  --fc-today-bg-color: rgba(141, 162, 251, 0.08);
+  --fc-now-indicator-color: #ff7b83;
+  color: #cbd5e1;
+}
+
+.life-terminal-calendar .fc {
+  font-size: 12px;
+}
+
+.life-terminal-calendar .fc-toolbar-title {
+  color: #f8fafc;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.life-terminal-calendar .fc-button {
+  border-radius: 6px;
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.life-terminal-calendar .fc-col-header-cell,
+.life-terminal-calendar .fc-timegrid-slot-label,
+.life-terminal-calendar .fc-daygrid-day-number {
+  color: #94a3b8;
+}
+
+.life-terminal-calendar .fc-event {
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.life-terminal-calendar .fc-impact-low {
+  --fc-event-bg-color: rgba(52, 211, 153, 0.16);
+  --fc-event-border-color: rgba(52, 211, 153, 0.55);
+  --fc-event-text-color: #d1fae5;
+}
+
+.life-terminal-calendar .fc-impact-medium {
+  --fc-event-bg-color: rgba(141, 162, 251, 0.18);
+  --fc-event-border-color: rgba(141, 162, 251, 0.48);
+  --fc-event-text-color: #dfe7ff;
+}
+
+.life-terminal-calendar .fc-impact-high {
+  --fc-event-bg-color: rgba(251, 191, 36, 0.18);
+  --fc-event-border-color: rgba(251, 191, 36, 0.68);
+  --fc-event-text-color: #fef3c7;
+}
+
+.life-terminal-calendar .fc-impact-critical {
+  --fc-event-bg-color: rgba(251, 113, 133, 0.18);
+  --fc-event-border-color: rgba(251, 113, 133, 0.72);
+  --fc-event-text-color: #ffe4e6;
+}

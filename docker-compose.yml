@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: life-regime-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: life_regime_tracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - life-regime-postgres:/var/lib/postgresql/data
+
+volumes:
+  life-regime-postgres:

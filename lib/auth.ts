@@ -1,0 +1,93 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import crypto from "node:crypto";
+import { prisma } from "@/lib/prisma";
+
+const COOKIE_NAME = "life_regime_session";
+const SESSION_DAYS = 30;
+
+type SessionPayload = {
+  userId: string;
+  exp: number;
+};
+
+function signingSecret() {
+  return process.env.AUTH_SECRET || process.env.APP_ACCESS_KEY || "dev-only-life-regime-secret";
+}
+
+function accessKey() {
+  return process.env.APP_ACCESS_KEY || "dev-access-key";
+}
+
+function encode(payload: SessionPayload) {
+  const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const sig = crypto.createHmac("sha256", signingSecret()).update(body).digest("base64url");
+  return `${body}.${sig}`;
+}
+
+function decode(token?: string): SessionPayload | null {
+  if (!token) return null;
+  const [body, sig] = token.split(".");
+  if (!body || !sig) return null;
+  const expected = crypto.createHmac("sha256", signingSecret()).update(body).digest("base64url");
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as SessionPayload;
+  if (!payload.userId || payload.exp < Date.now()) return null;
+  return payload;
+}
+
+export async function ensureLocalUser() {
+  const existing = await prisma.user.findFirst({ orderBy: { createdAt: "asc" } });
+  if (existing) return existing;
+  return prisma.user.create({ data: { label: "Local user" } });
+}
+
+export async function createSessionCookie(userId: string) {
+  const jar = await cookies();
+  const exp = Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000;
+  jar.set(COOKIE_NAME, encode({ userId, exp }), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: new Date(exp)
+  });
+}
+
+export async function clearSessionCookie() {
+  const jar = await cookies();
+  jar.delete(COOKIE_NAME);
+}
+
+export async function getCurrentUser() {
+  const jar = await cookies();
+  const session = decode(jar.get(COOKIE_NAME)?.value);
+  if (!session) return null;
+  return prisma.user.findUnique({ where: { id: session.userId } });
+}
+
+export async function requireUser() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  return user;
+}
+
+export async function requireApiUser() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { user: null, response: Response.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+  return { user, response: null };
+}
+
+export async function authenticateAccessKey(candidate: string) {
+  const expected = accessKey();
+  const a = Buffer.from(candidate);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  return ensureLocalUser();
+}
+
+export function isUsingDevAccessKey() {
+  return !process.env.APP_ACCESS_KEY;
+}

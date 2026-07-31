@@ -1,0 +1,355 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DailyLogStatus {
+  EMPTY
+  DRAFT
+  SUBMITTED
+  ANALYZED
+  MISSING
+  SKIPPED
+}
+
+enum TaskImportance {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TaskStatus {
+  PLANNED
+  IN_PROGRESS
+  DONE
+  POSTPONED
+  CANCELLED
+}
+
+enum CalendarEventType {
+  EXAM
+  INTERVIEW
+  DEADLINE
+  ADMIN
+  SOCIAL
+  TRAINING
+  RECOVERY
+  TRAVEL
+  PERSONAL
+}
+
+enum CalendarImpact {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ObjectiveKind {
+  OBJECTIVE
+  PROJECT
+  MILESTONE
+}
+
+enum ObjectiveHorizon {
+  YEAR
+  QUARTER
+  MONTH
+  WEEK
+}
+
+enum ObjectiveStatus {
+  PLANNED
+  ACTIVE
+  ON_TRACK
+  AT_RISK
+  PAUSED
+  DONE
+}
+
+enum ObjectivePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum WeeklyPlanCategory {
+  WORK
+  STUDY
+  SPORT
+  REST
+  ADMIN
+  PERSONAL
+  SOCIAL
+  TRAVEL
+}
+
+model User {
+  id            String          @id @default(cuid())
+  label         String          @default("Local user")
+  calorieTarget Int             @default(2200)
+  defaultSleepDelayMin Int      @default(20)
+  dailyLogs     DailyLog[]
+  tasks         Task[]
+  events        CalendarEvent[]
+  timeCategories TimeAllocationCategory[]
+  timeAllocations DailyTimeAllocation[]
+  planningContexts DailyPlanningContext[]
+  habits       Habit[]
+  habitCheckins HabitCheckin[]
+  routineBlocks RoutineBlock[]
+  objectives    Objective[]
+  weeklyPlanBlocks WeeklyPlanBlock[]
+  weeklyReports WeeklyReport[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model DailyLog {
+  id                     String         @id @default(cuid())
+  userId                 String
+  user                   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date                   DateTime       @db.Date
+  status                 DailyLogStatus @default(EMPTY)
+  energy                 Int?
+  productivity           Int?
+  startFriction          Int?
+  calorieTarget          Int?
+  caloriePercent         Int?
+  trainingDone           Boolean?
+  mentalFatigue          Int?
+  physicalFatigue        Int?
+  focusQuality           Int?
+  workTimeMinutes        Int?
+  distractionTimeMinutes Int?
+  avoidedImportantTask   Boolean?
+  mainBlocker            String?
+  improvementTomorrow    String?
+  sleepIntentClickedAt   DateTime?
+  estimatedSleepDelayMin Int?
+  estimatedSleepStart    DateTime?
+  textSummary            String?
+  voiceTranscript        String?
+  executionScore         Int?
+  stateScore             Int?
+  riskScore              Int?
+  riskDelta              Int?
+  riskAcceleration       Int?
+  regime                 String?
+  regimeConfidence       Int?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  submittedAt            DateTime?
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model Task {
+  id                String         @id @default(cuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  objectiveId       String?
+  objective         Objective?     @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+  title             String
+  date              DateTime       @db.Date
+  importance        TaskImportance @default(MEDIUM)
+  productive        Boolean        @default(true)
+  estimatedMinutes  Int            @default(0)
+  completionPercent Int            @default(0)
+  status            TaskStatus     @default(PLANNED)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, objectiveId])
+}
+
+model TimeAllocationCategory {
+  id             String                @id @default(cuid())
+  userId         String
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  objective      String?
+  targetWeight   Int                   @default(0)
+  expectedReturn Int                   @default(50)
+  risk           Int                   @default(50)
+  beta           Float                 @default(1)
+  color          String                @default("#22d3ee")
+  active         Boolean               @default(true)
+  allocations    DailyTimeAllocation[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([userId, active])
+}
+
+model DailyTimeAllocation {
+  id             String                 @id @default(cuid())
+  userId         String
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId     String
+  category       TimeAllocationCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  date           DateTime               @db.Date
+  plannedMinutes Int                    @default(0)
+  plannedMinutesManual Boolean          @default(false)
+  actualMinutes  Int                    @default(0)
+  note           String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([userId, categoryId, date])
+  @@index([userId, date])
+}
+
+model DailyPlanningContext {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date             DateTime @db.Date
+  dayBudgetMinutes Int      @default(720)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model Habit {
+  id                     String         @id @default(cuid())
+  userId                 String
+  user                   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                   String
+  category               String         @default("routine")
+  description            String?
+  targetTime             String?
+  defaultExpectedMinutes Int            @default(0)
+  sortOrder              Int            @default(0)
+  active                 Boolean        @default(true)
+  source                 String         @default("manual")
+  checkins               HabitCheckin[]
+  routineBlocks          RoutineBlock[]
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  @@index([userId, active])
+}
+
+model HabitCheckin {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId       String
+  habit         Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  date          DateTime @db.Date
+  status        String   @default("planned")
+  actualMinutes Int      @default(0)
+  note          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, habitId, date])
+  @@index([userId, date])
+}
+
+model RoutineBlock {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId   String?
+  habit     Habit?   @relation(fields: [habitId], references: [id], onDelete: SetNull)
+  dayType   String   @default("school_day")
+  label     String
+  startTime String
+  endTime   String
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, dayType, active])
+}
+
+model CalendarEvent {
+  id                      String            @id @default(cuid())
+  userId                  String
+  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title                   String
+  type                    CalendarEventType @default(PERSONAL)
+  start                   DateTime
+  end                     DateTime
+  impact                  CalendarImpact    @default(MEDIUM)
+  expectedStress          Int               @default(50)
+  expectedPreparationLoad Int               @default(50)
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  @@index([userId, start])
+}
+
+model WeeklyReport {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekId    String
+  content   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, weekId])
+}
+
+model Objective {
+  id          String             @id @default(cuid())
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      Objective?         @relation("ObjectiveTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Objective[]        @relation("ObjectiveTree")
+  title       String
+  summary     String?
+  nextAction  String?
+  kind        ObjectiveKind      @default(OBJECTIVE)
+  horizon     ObjectiveHorizon
+  status      ObjectiveStatus    @default(PLANNED)
+  priority    ObjectivePriority  @default(MEDIUM)
+  targetDate  DateTime?          @db.Date
+  weekId      String?
+  color       String             @default("#8da2fb")
+  sortOrder   Int                @default(0)
+  archived    Boolean            @default(false)
+  tasks       Task[]
+  weeklyBlocks WeeklyPlanBlock[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([userId, archived, horizon])
+  @@index([userId, weekId])
+  @@index([parentId])
+}
+
+model WeeklyPlanBlock {
+  id              String             @id @default(cuid())
+  userId          String
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  objectiveId     String?
+  objective       Objective?         @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+  title           String
+  category        WeeklyPlanCategory @default(WORK)
+  date            DateTime           @db.Date
+  startTime       String?
+  endTime         String?
+  durationMinutes Int                @default(60)
+  flexible        Boolean            @default(false)
+  note            String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, objectiveId])
+}

@@ -1,0 +1,14 @@
+node_modules
+.next
+.env
+.env.local
+dist
+coverage
+*.log
+.pnpm-store
+.runtime
+.venv
+interface_API/.venv
+__pycache__
+*.pyc
+tsconfig.tsbuildinfo
