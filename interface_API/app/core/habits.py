@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from ..models import Habit, HabitCheckin, RoutineBlock
+from ..models import Habit, HabitCheckin, RoutineBlock, utcnow
 from .dates import add_days, parse_date_key, to_date_key
+from .numbers import javascript_round
 
 
 def get_habit_tracker_data(db: Session, user_id: str, date_key: str | None = None) -> dict:
@@ -93,9 +95,13 @@ def get_habit_tracker_data(db: Session, user_id: str, date_key: str | None = Non
         "metrics": {
             "completedToday": completed_today,
             "totalToday": len(habits),
-            "completionRateToday": 0 if not habits else round(completed_today / len(habits) * 100),
+            "completionRateToday": 0
+            if not habits
+            else javascript_round(completed_today / len(habits) * 100),
             "sevenDayCompletionRate": (
-                0 if seven_day_possible == 0 else round(seven_day_done / seven_day_possible * 100)
+                0
+                if seven_day_possible == 0
+                else javascript_round(seven_day_done / seven_day_possible * 100)
             ),
         },
     }
@@ -111,29 +117,25 @@ def upsert_habit_checkin(
     note: str | None = None,
 ) -> HabitCheckin:
     day = parse_date_key(date_key)
-    existing = db.execute(
-        select(HabitCheckin).where(
-            HabitCheckin.userId == user_id,
-            HabitCheckin.habitId == habit_id,
-            HabitCheckin.date == day,
-        )
-    ).scalar_one_or_none()
-    if existing is None:
-        existing = HabitCheckin(
-            userId=user_id,
-            habitId=habit_id,
-            date=day,
-            status=status or "planned",
-            actualMinutes=actual_minutes or 0,
-            note=note,
-        )
-        db.add(existing)
-    else:
-        if status is not None:
-            existing.status = status
-        if actual_minutes is not None:
-            existing.actualMinutes = actual_minutes
-        if note is not None:
-            existing.note = note
+    insert_statement = insert(HabitCheckin).values(
+        userId=user_id,
+        habitId=habit_id,
+        date=day,
+        status=status or "planned",
+        actualMinutes=actual_minutes or 0,
+        note=note,
+    )
+    update_values: dict[str, object] = {"updatedAt": utcnow()}
+    if status is not None:
+        update_values["status"] = status
+    if actual_minutes is not None:
+        update_values["actualMinutes"] = actual_minutes
+    if note is not None:
+        update_values["note"] = note
+    upsert_statement = insert_statement.on_conflict_do_update(
+        index_elements=[HabitCheckin.userId, HabitCheckin.habitId, HabitCheckin.date],
+        set_=update_values,
+    ).returning(HabitCheckin)
+    checkin = db.execute(upsert_statement).scalar_one()
     db.flush()
-    return existing
+    return checkin

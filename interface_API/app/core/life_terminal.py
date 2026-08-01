@@ -9,7 +9,14 @@ from sqlalchemy.orm import Session
 
 from ..models import CalendarEvent, DailyLog, Task, User
 from .dates import add_days, get_iso_week_id, get_week_date_keys, iso_datetime, parse_date_key, to_date_key
-from .metrics import build_weekly_json_export, compute_weekly_summary, get_trajectory, serialize_calendar_event
+from .metrics import (
+    build_interpretation_messages,
+    build_weekly_json_export,
+    compute_weekly_summary,
+    get_trajectory,
+    serialize_calendar_event,
+)
+from .numbers import javascript_round
 from .regime import build_transition_matrix_placeholder, compute_regime, simulate_next_week
 from .scoring import _log_as_regime_dict
 from .time_allocation import get_time_allocation_data
@@ -42,11 +49,11 @@ def _pressure_for_events(events: list[CalendarEvent]) -> int:
     if not events:
         return 0
     strongest = max(IMPACT_PRESSURE[event.impact] for event in events)
-    average_load = round(
+    average_load = javascript_round(
         sum((event.expectedStress + event.expectedPreparationLoad) / 2 for event in events)
         / len(events)
     )
-    return min(100, round(strongest * 0.6 + average_load * 0.4))
+    return min(100, javascript_round(strongest * 0.6 + average_load * 0.4))
 
 
 def _risk_band(risk_score: int | None) -> str:
@@ -130,7 +137,7 @@ def _build_life_tape(
     execution = (
         today_log.executionScore
         if today_log and today_log.executionScore is not None
-        else round(todo_metrics["weightedCompletionRate"] * 100)
+        else javascript_round(todo_metrics["weightedCompletionRate"] * 100)
     )
     friction = today_log.startFriction if today_log else None
     energy = today_log.energy if today_log else None
@@ -208,12 +215,36 @@ def get_life_terminal_data(db: Session, user: User, today: str | None = None) ->
     next_high_impact_event = get_next_high_impact_event(db, user.id, today)
     trajectory = get_trajectory(db, user.id, 30, today)
     weekly_summary = compute_weekly_summary(db, user.id, week_id)
+    previous_week_summary = compute_weekly_summary(
+        db, user.id, get_iso_week_id(add_days(today, -7))
+    )
     range_events = _events_between(db, user.id, range_start, add_days(range_end, 1))
     week_events = _events_between(db, user.id, week_start, add_days(week_end, 1))
     range_tasks = _tasks_between(db, user.id, range_start, range_end)
     week_tasks = _tasks_between(db, user.id, week_start, week_end)
     weekly_export = build_weekly_json_export(db, user.id, week_id)
     time_allocation = get_time_allocation_data(db, user.id, today)
+    interpretation_logs = list(
+        db.execute(
+            select(DailyLog)
+            .where(
+                DailyLog.userId == user.id,
+                DailyLog.date >= parse_date_key(f"{today[:8]}01"),
+            )
+            .order_by(DailyLog.date.asc())
+        ).scalars()
+    )
+    interpretation = build_interpretation_messages(
+        interpretation_logs,
+        weekly_summary,
+        calendar_context,
+        execution_improved=(
+            weekly_summary["avgExecutionScore"] is not None
+            and previous_week_summary["avgExecutionScore"] is not None
+            and weekly_summary["avgExecutionScore"]
+            > previous_week_summary["avgExecutionScore"]
+        ),
+    )
 
     calendar_pressure_today = _pressure_for_events(
         [event for event in range_events if event.start.date().isoformat() == today]
@@ -237,7 +268,9 @@ def get_life_terminal_data(db: Session, user: User, today: str | None = None) ->
             {
                 **point,
                 "calendarPressure": _pressure_for_events(events),
-                "todoCompletion": round(calculate_todo_metrics(tasks)["weightedCompletionRate"] * 100),
+                "todoCompletion": javascript_round(
+                    calculate_todo_metrics(tasks)["weightedCompletionRate"] * 100
+                ),
             }
         )
 
@@ -250,7 +283,10 @@ def get_life_terminal_data(db: Session, user: User, today: str | None = None) ->
         "productive": [_serialize_task(task) for task in active_tasks if task.productive],
     }
     weekly_task_metrics = calculate_todo_metrics(week_tasks)
-    pressure_level = max(calendar_pressure_today, round(calendar_context["averageStress"]))
+    pressure_level = max(
+        calendar_pressure_today,
+        javascript_round(calendar_context["averageStress"]),
+    )
 
     quick_log = (
         {
@@ -387,4 +423,6 @@ def get_life_terminal_data(db: Session, user: User, today: str | None = None) ->
             "enoughDataForRegimeDetection": len(recent_submitted_logs) >= 2 or today_log is not None,
             "weeklyExportPreview": weekly_export,
         },
+        "weeklySummary": weekly_summary,
+        "interpretation": interpretation,
     }

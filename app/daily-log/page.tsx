@@ -1,9 +1,11 @@
 import { AppShell } from "@/components/AppShell";
-import { DailyLogDatePicker, type DayLogStatus } from "@/components/DailyLogDatePicker";
-import { DailyLogForm } from "@/components/DailyLogForm";
+import { parseDailyLogStatuses } from "@/features/daily-log/api/dailyLogApi";
+import { DailyLogDatePicker } from "@/features/daily-log/components/DailyLogDatePicker";
+import { DailyLogForm } from "@/features/daily-log/components/DailyLogForm";
+import { parseSettingsResponse } from "@/features/settings/api/settingsApi";
 import { requireUser } from "@/lib/auth";
 import { addDays, parseDateKey, toDateKey } from "@/lib/dates";
-import { prisma } from "@/lib/prisma";
+import { requestInternalApiJson } from "@/lib/server/internalApiClient";
 
 function normalizeDateParam(value?: string) {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : toDateKey();
@@ -24,25 +26,26 @@ export default async function DailyLogPage({
 }: {
   searchParams?: Promise<{ date?: string }>;
 }) {
-  const user = await requireUser();
+  await requireUser();
   const params = await searchParams;
   const date = normalizeDateParam(params?.date);
   const { from, to } = monthBounds(date);
-  const monthLogs = await prisma.dailyLog.findMany({
-    where: {
-      userId: user.id,
-      date: { gte: parseDateKey(from), lt: parseDateKey(to) }
-    },
-    select: { date: true, status: true }
-  });
-  const statuses: Record<string, DayLogStatus> = Object.fromEntries(
-    monthLogs.map((log) => [log.date.toISOString().slice(0, 10), log.status.toLowerCase() as DayLogStatus])
-  );
+  const [statuses, settings] = await Promise.all([
+    requestInternalApiJson(
+      `/api/daily-log/statuses?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      parseDailyLogStatuses
+    ),
+    requestInternalApiJson("/api/settings", parseSettingsResponse)
+  ]);
 
   return (
     <AppShell>
       <DailyLogDatePicker selectedDate={date} statuses={statuses} />
-      <DailyLogForm selectedDate={date} defaultSleepDelayMin={user.defaultSleepDelayMin} calorieTarget={user.calorieTarget} />
+      <DailyLogForm
+        selectedDate={date}
+        defaultSleepDelayMin={settings.defaultSleepDelayMin}
+        calorieTarget={settings.calorieTarget}
+      />
     </AppShell>
   );
 }

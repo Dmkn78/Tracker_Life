@@ -3,11 +3,17 @@ import { Activity, CalendarPlus, FolderKanban, ListPlus, MonitorCog, NotebookPen
 import { AppShell } from "@/components/AppShell";
 import { TrajectoryCharts } from "@/components/TrajectoryCharts";
 import { Metric, Panel, PrimaryButton } from "@/components/ui";
+import { parseLifeTerminalData } from "@/features/life-terminal/api/lifeTerminalApi";
+import { requireUser } from "@/lib/auth";
 import { formatDisplayDate } from "@/lib/dates";
-import { getLifeTerminalData } from "@/lib/lifeTerminal";
+import { requestInternalApiJson } from "@/lib/server/internalApiClient";
 
 export default async function HomePage() {
-  const data = await getLifeTerminalData();
+  await requireUser();
+  const data = await requestInternalApiJson(
+    "/api/life-terminal",
+    parseLifeTerminalData
+  );
   const mainTask =
     data.taskSections.highImportance[0] ??
     data.taskSections.today.find((task) => task.status !== "done") ??

@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Body, Depends, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from ..contracts.enums import ObjectiveKind
+from ..contracts.objectives import ObjectiveCreateRequest, ObjectiveUpdateRequest
 from ..database import get_db
 from ..models import Objective, Task, User, WeeklyPlanBlock
 from ..security import get_current_user
@@ -17,16 +18,57 @@ from ..core.objectives import (
 router = APIRouter(prefix="/api/objectives", tags=["objectives"])
 
 
-def _as_enum(value, fallback: str) -> str:
-    return str(value or fallback).upper()
+def _validate_objective_parent(
+    db: Session,
+    user_id: str,
+    objective_id: str | None,
+    parent_id: str | None,
+) -> None:
+    if not parent_id:
+        return
+
+    visited_objective_ids = {objective_id} if objective_id else set()
+    current_parent_id: str | None = parent_id
+    while current_parent_id:
+        if current_parent_id in visited_objective_ids:
+            raise HTTPException(status_code=400, detail="Objective hierarchy cannot contain a cycle")
+        visited_objective_ids.add(current_parent_id)
+        parent = db.execute(
+            select(Objective).where(
+                Objective.id == current_parent_id,
+                Objective.userId == user_id,
+                Objective.archived.is_(False),
+            )
+        ).scalar_one_or_none()
+        if parent is None:
+            raise HTTPException(status_code=400, detail="Invalid parentId")
+        current_parent_id = parent.parentId
 
 
-def _normalize_week_id(body: dict) -> str | None:
-    if body.get("weekId"):
-        return body["weekId"]
-    if (body.get("horizon") or "").lower() == "week" and body.get("targetDate"):
-        return get_iso_week_id(body["targetDate"])
-    if (body.get("horizon") or "").lower() == "week":
+def _validate_block_objective(
+    db: Session,
+    user_id: str,
+    objective_id: str | None,
+) -> None:
+    if not objective_id:
+        return
+    objective = db.execute(
+        select(Objective).where(
+            Objective.id == objective_id,
+            Objective.userId == user_id,
+            Objective.archived.is_(False),
+        )
+    ).scalar_one_or_none()
+    if objective is None:
+        raise HTTPException(status_code=400, detail="Invalid objectiveId")
+
+
+def _normalize_week_id(body: ObjectiveCreateRequest) -> str | None:
+    if body.week_id:
+        return body.week_id
+    if body.horizon.value == "WEEK" and body.target_date:
+        return get_iso_week_id(body.target_date.isoformat())
+    if body.horizon.value == "WEEK":
         return get_iso_week_id()
     return None
 
@@ -42,141 +84,145 @@ def get_objectives(
 
 @router.post("")
 def create_objective(
-    body: dict = Body(...),
+    body: ObjectiveCreateRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if body.get("kind") == "bootstrap_demo":
-        return bootstrap_objectives_demo(db, user.id, body.get("weekId") or get_iso_week_id())
+    if body.kind == "bootstrap_demo":
+        return bootstrap_objectives_demo(db, user.id, body.week_id or get_iso_week_id())
 
-    if body.get("kind") == "weekly_block":
+    if body.kind == "weekly_block":
+        _validate_block_objective(db, user.id, body.objective_id)
+        block_date = body.date or parse_date_key(to_date_key())
         block = WeeklyPlanBlock(
             userId=user.id,
-            objectiveId=body.get("objectiveId") or None,
-            title=body.get("title") or "Planned block",
-            category=_as_enum(body.get("category"), "WORK"),
-            date=parse_date_key(body.get("date") or to_date_key()),
-            startTime=body.get("startTime") or None,
-            endTime=body.get("endTime") or None,
-            durationMinutes=body.get("durationMinutes") if body.get("durationMinutes") is not None else 60,
-            flexible=body.get("flexible") or False,
-            note=body.get("note") or None,
+            objectiveId=body.objective_id or None,
+            title=body.title or "Planned block",
+            category=body.category.value,
+            date=block_date,
+            startTime=body.start_time or None,
+            endTime=body.end_time or None,
+            durationMinutes=body.duration_minutes,
+            flexible=body.flexible,
+            note=body.note or None,
         )
         db.add(block)
         db.flush()
         return {
             "block": {"id": block.id},
             "data": get_objectives_data(
-                db, user.id, body.get("weekId") or get_iso_week_id(block.date.isoformat())
+                db, user.id, body.week_id or get_iso_week_id(block.date.isoformat())
             ),
         }
 
+    objective_kind = body.kind if isinstance(body.kind, ObjectiveKind) else ObjectiveKind.OBJECTIVE
+    _validate_objective_parent(db, user.id, None, body.parent_id)
     objective = Objective(
         userId=user.id,
-        parentId=body.get("parentId") or None,
-        title=(body.get("title") or "").strip() or default_objective_title(body.get("kind")),
-        summary=body.get("summary") or None,
-        nextAction=body.get("nextAction") or None,
-        kind=_as_enum(body.get("kind"), "OBJECTIVE"),
-        horizon=_as_enum(body.get("horizon"), "WEEK"),
-        status=_as_enum(body.get("status"), "PLANNED"),
-        priority=_as_enum(body.get("priority"), "MEDIUM"),
-        targetDate=parse_date_key(body["targetDate"]) if body.get("targetDate") else None,
+        parentId=body.parent_id or None,
+        title=(body.title or "").strip() or default_objective_title(objective_kind.value),
+        summary=body.summary or None,
+        nextAction=body.next_action or None,
+        kind=objective_kind.value,
+        horizon=body.horizon.value,
+        status=body.status.value,
+        priority=body.priority.value,
+        targetDate=body.target_date,
         weekId=_normalize_week_id(body),
-        color=body.get("color") or "#8da2fb",
-        sortOrder=body.get("sortOrder") if body.get("sortOrder") is not None else 0,
+        color=body.color or "#8da2fb",
+        sortOrder=body.sort_order,
     )
     db.add(objective)
     db.flush()
-    linked = body.get("linkedTaskIds")
-    sync_objective_tasks(db, user.id, objective.id, linked if isinstance(linked, list) else [])
+    sync_objective_tasks(db, user.id, objective.id, body.linked_task_ids)
     return {
         "objective": {"id": objective.id},
-        "data": get_objectives_data(db, user.id, body.get("weekId") or _normalize_week_id(body)),
+        "data": get_objectives_data(db, user.id, body.week_id or _normalize_week_id(body)),
     }
 
 
 @router.patch("")
 def update_objective(
-    body: dict = Body(...),
+    body: ObjectiveUpdateRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if body.get("kind") == "weekly_block":
+    if body.kind == "weekly_block":
         existing = db.execute(
             select(WeeklyPlanBlock).where(
-                WeeklyPlanBlock.id == body.get("id"), WeeklyPlanBlock.userId == user.id
+                WeeklyPlanBlock.id == body.id, WeeklyPlanBlock.userId == user.id
             )
         ).scalar_one_or_none()
         if existing is None:
-            return JSONResponse({"error": "Weekly block not found"}, status_code=404)
-        if "objectiveId" in body:
-            existing.objectiveId = body["objectiveId"] or None
-        if body.get("title") is not None:
-            existing.title = body["title"]
-        if body.get("category"):
-            existing.category = _as_enum(body["category"], "WORK")
-        if body.get("date"):
-            existing.date = parse_date_key(body["date"])
-        if "startTime" in body:
-            existing.startTime = body["startTime"] or None
-        if "endTime" in body:
-            existing.endTime = body["endTime"] or None
-        if body.get("durationMinutes") is not None:
-            existing.durationMinutes = body["durationMinutes"]
-        if body.get("flexible") is not None:
-            existing.flexible = body["flexible"]
-        if "note" in body:
-            existing.note = body["note"] or None
+            raise HTTPException(status_code=404, detail="Weekly block not found")
+        provided_fields = body.model_fields_set
+        if "objective_id" in provided_fields:
+            _validate_block_objective(db, user.id, body.objective_id)
+            existing.objectiveId = body.objective_id or None
+        if body.title is not None:
+            existing.title = body.title
+        if body.category is not None:
+            existing.category = body.category.value
+        if body.date is not None:
+            existing.date = body.date
+        if "start_time" in provided_fields:
+            existing.startTime = body.start_time or None
+        if "end_time" in provided_fields:
+            existing.endTime = body.end_time or None
+        if body.duration_minutes is not None:
+            existing.durationMinutes = body.duration_minutes
+        if body.flexible is not None:
+            existing.flexible = body.flexible
+        if "note" in provided_fields:
+            existing.note = body.note or None
         db.flush()
         return {
             "block": {"id": existing.id},
             "data": get_objectives_data(
-                db, user.id, body.get("weekId") or get_iso_week_id(existing.date.isoformat())
+                db, user.id, body.week_id or get_iso_week_id(existing.date.isoformat())
             ),
         }
 
     existing = db.execute(
-        select(Objective).where(Objective.id == body.get("id"), Objective.userId == user.id)
+        select(Objective).where(Objective.id == body.id, Objective.userId == user.id)
     ).scalar_one_or_none()
     if existing is None:
-        return JSONResponse({"error": "Objective not found"}, status_code=404)
-    if body.get("parentId") and body["parentId"] == existing.id:
-        return JSONResponse({"error": "An objective cannot be its own parent."}, status_code=400)
-
-    if "parentId" in body:
-        existing.parentId = body["parentId"] or None
-    if body.get("title") is not None:
-        existing.title = body["title"]
-    if "summary" in body:
-        existing.summary = body["summary"] or None
-    if "nextAction" in body:
-        existing.nextAction = body["nextAction"] or None
-    if body.get("kind"):
-        existing.kind = _as_enum(body["kind"], existing.kind)
-    if body.get("horizon"):
-        existing.horizon = _as_enum(body["horizon"], existing.horizon)
-    if body.get("status"):
-        existing.status = _as_enum(body["status"], existing.status)
-    if body.get("priority"):
-        existing.priority = _as_enum(body["priority"], existing.priority)
-    if "targetDate" in body:
-        existing.targetDate = parse_date_key(body["targetDate"]) if body["targetDate"] else None
-    if "weekId" in body:
-        existing.weekId = body["weekId"] or None
-    if body.get("color") is not None:
-        existing.color = body["color"]
-    if body.get("sortOrder") is not None:
-        existing.sortOrder = body["sortOrder"]
-    if body.get("archived") is not None:
-        existing.archived = body["archived"]
+        raise HTTPException(status_code=404, detail="Objective not found")
+    provided_fields = body.model_fields_set
+    if "parent_id" in provided_fields:
+        _validate_objective_parent(db, user.id, existing.id, body.parent_id)
+        existing.parentId = body.parent_id or None
+    if body.title is not None:
+        existing.title = body.title
+    if "summary" in provided_fields:
+        existing.summary = body.summary or None
+    if "next_action" in provided_fields:
+        existing.nextAction = body.next_action or None
+    if isinstance(body.kind, ObjectiveKind):
+        existing.kind = body.kind.value
+    if body.horizon is not None:
+        existing.horizon = body.horizon.value
+    if body.status is not None:
+        existing.status = body.status.value
+    if body.priority is not None:
+        existing.priority = body.priority.value
+    if "target_date" in provided_fields:
+        existing.targetDate = body.target_date
+    if "week_id" in provided_fields:
+        existing.weekId = body.week_id or None
+    if body.color is not None:
+        existing.color = body.color
+    if body.sort_order is not None:
+        existing.sortOrder = body.sort_order
+    if body.archived is not None:
+        existing.archived = body.archived
     db.flush()
-    if isinstance(body.get("linkedTaskIds"), list):
-        sync_objective_tasks(db, user.id, existing.id, body["linkedTaskIds"])
+    if body.linked_task_ids is not None:
+        sync_objective_tasks(db, user.id, existing.id, body.linked_task_ids)
     return {
         "objective": {"id": existing.id},
         "data": get_objectives_data(
-            db, user.id, body.get("weekId") or existing.weekId or get_iso_week_id()
+            db, user.id, body.week_id or existing.weekId or get_iso_week_id()
         ),
     }
 
@@ -191,14 +237,14 @@ def delete_objective(
 ):
     week_id = week_id or get_iso_week_id()
     if not id:
-        return JSONResponse({"error": "Missing id"}, status_code=400)
+        raise HTTPException(status_code=400, detail="Missing id")
 
     if kind == "weekly_block":
         existing = db.execute(
             select(WeeklyPlanBlock).where(WeeklyPlanBlock.id == id, WeeklyPlanBlock.userId == user.id)
         ).scalar_one_or_none()
         if existing is None:
-            return JSONResponse({"error": "Weekly block not found"}, status_code=404)
+            raise HTTPException(status_code=404, detail="Weekly block not found")
         db.delete(existing)
         db.flush()
         return get_objectives_data(db, user.id, week_id)
@@ -207,7 +253,7 @@ def delete_objective(
         select(Objective).where(Objective.id == id, Objective.userId == user.id)
     ).scalar_one_or_none()
     if existing is None:
-        return JSONResponse({"error": "Objective not found"}, status_code=404)
+        raise HTTPException(status_code=404, detail="Objective not found")
 
     db.execute(
         update(Task).where(Task.userId == user.id, Task.objectiveId == existing.id).values(objectiveId=None)

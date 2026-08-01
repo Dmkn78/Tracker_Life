@@ -3,40 +3,27 @@ import { ArrowRight, CalendarClock } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { TrajectoryCharts } from "@/components/TrajectoryCharts";
 import { Metric, Panel, PrimaryButton } from "@/components/ui";
+import { parseLifeTerminalData } from "@/features/life-terminal/api/lifeTerminalApi";
 import { requireUser } from "@/lib/auth";
-import { getIsoWeekId, parseDateKey, toDateKey } from "@/lib/dates";
-import { buildInterpretationMessages, computeWeeklySummary, getTrajectory, serializeCalendarEvent } from "@/lib/metrics";
-import { prisma } from "@/lib/prisma";
-import { getCalendarContext, getNextHighImpactEvent, getTodoMetrics } from "@/lib/todoMetrics";
+import { requestInternalApiJson } from "@/lib/server/internalApiClient";
 
 export default async function LifeDashboardPage() {
-  const user = await requireUser();
-  const today = toDateKey();
-  const weekId = getIsoWeekId(today);
-  const [todayLog, todo, calendar, nextHighImpactEvent, trajectory, weeklySummary, weekLogs, lastWeekSummary] =
-    await Promise.all([
-      prisma.dailyLog.findUnique({ where: { userId_date: { userId: user.id, date: parseDateKey(today) } } }),
-      getTodoMetrics(user.id, today),
-      getCalendarContext(user.id, today),
-      getNextHighImpactEvent(user.id, today),
-      getTrajectory(user.id, 30, today),
-      computeWeeklySummary(user.id, weekId),
-      prisma.dailyLog.findMany({
-        where: { userId: user.id, date: { gte: parseDateKey(today.slice(0, 8) + "01") } },
-        orderBy: { date: "asc" }
-      }),
-      computeWeeklySummary(user.id, getIsoWeekId(new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10)))
-    ]);
-  const interpretation = buildInterpretationMessages({
-    logs: weekLogs,
-    weeklySummary,
-    calendarContext: calendar,
-    executionImproved:
-      weeklySummary.avgExecutionScore != null &&
-      lastWeekSummary.avgExecutionScore != null &&
-      weeklySummary.avgExecutionScore > lastWeekSummary.avgExecutionScore
-  });
-  const nextEvent = serializeCalendarEvent(nextHighImpactEvent);
+  await requireUser();
+  const data = await requestInternalApiJson(
+    "/api/life-terminal",
+    parseLifeTerminalData
+  );
+  const tapeValues = new Map(data.lifeTape.items.map((item) => [item.label, item.value]));
+  const todayLog = {
+    stateScore: tapeValues.get("STATE") ?? null,
+    riskScore: tapeValues.get("RISK") ?? null,
+    executionScore: tapeValues.get("EXECUTION") ?? null,
+    startFriction: data.quickLog.startFriction,
+    status: data.quickLog.status
+  };
+  const calendar = data.calendarContext;
+  const nextEvent = data.terminalHeader.nextHighImpactEvent;
+  const weeklySummary = data.weeklySummary;
 
   return (
     <AppShell>
@@ -57,9 +44,9 @@ export default async function LifeDashboardPage() {
       <div className="mb-4 grid gap-3 md:grid-cols-4">
         <Metric label="State today" value={String(todayLog?.stateScore ?? "--")} tone="good" />
         <Metric label="Risk today" value={String(todayLog?.riskScore ?? "--")} tone="warn" />
-        <Metric label="Execution today" value={String(todayLog?.executionScore ?? Math.round(todo.metrics.weightedCompletionRate * 100))} />
-        <Metric label="Start friction" value={String(todayLog?.startFriction ?? "--")} tone="risk" />
-        <Metric label="Log status" value={(todayLog?.status ?? "MISSING").toLowerCase()} />
+        <Metric label="Execution today" value={String(todayLog.executionScore ?? "--")} />
+        <Metric label="Start friction" value={String(todayLog.startFriction)} tone="risk" />
+        <Metric label="Log status" value={todayLog.status} />
         <Metric label="Weekly completion" value={`${Math.round((weeklySummary.avgExecutionScore ?? 0))}%`} />
         <Metric label="Calendar phase" value={calendar.activePhase.replaceAll("_", " ")} />
         <Metric label="High-impact next" value={nextEvent?.title ?? "none"} tone={nextEvent ? "risk" : "neutral"} />
@@ -88,7 +75,7 @@ export default async function LifeDashboardPage() {
         <Panel>
           <p className="text-xs font-semibold uppercase text-accent">Rule-based interpretation</p>
           <div className="mt-3 space-y-2">
-            {interpretation.map((message) => (
+            {data.interpretation.map((message) => (
               <p key={message} className="rounded-md border border-line bg-shell px-3 py-2 text-sm text-slate-300">
                 {message}
               </p>
@@ -97,7 +84,7 @@ export default async function LifeDashboardPage() {
         </Panel>
       </div>
 
-      <TrajectoryCharts data={trajectory} />
+      <TrajectoryCharts data={data.trajectory} />
     </AppShell>
   );
 }

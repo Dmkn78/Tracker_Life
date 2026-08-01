@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..models import CalendarEvent, Task
 from .dates import add_days, get_iso_week_id, get_week_date_keys, parse_date_key
+from .numbers import javascript_round
 
 IMPORTANCE_WEIGHT = {"LOW": 1, "MEDIUM": 2, "HIGH": 3}
 
@@ -72,8 +73,10 @@ def count_high_impact_events(events: list[CalendarEvent]) -> int:
 def weekly_expected_load(events: list[CalendarEvent]) -> tuple[int, int]:
     if not events:
         return 0, 0
-    stress = round(sum(event.expectedStress for event in events) / len(events))
-    preparation = round(sum(event.expectedPreparationLoad for event in events) / len(events))
+    stress = javascript_round(sum(event.expectedStress for event in events) / len(events))
+    preparation = javascript_round(
+        sum(event.expectedPreparationLoad for event in events) / len(events)
+    )
     return stress, preparation
 
 

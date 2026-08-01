@@ -1,10 +1,9 @@
-"""Life Regime Tracker API — standalone Python backend.
+"""Life Regime Tracker standalone API application."""
 
-Replaces the backend logic embedded in the Next.js app (app/api/* + lib/*).
-The frontend is meant to become a plain HTTP client of this API.
-"""
+import logging
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -14,6 +13,7 @@ from .routers import (
     calendar_events,
     daily_log,
     habits,
+    history,
     life_terminal,
     objectives,
     reports,
@@ -22,6 +22,8 @@ from .routers import (
     time_allocation,
     transcribe,
 )
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Life Regime Tracker API",
@@ -38,13 +40,38 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    validation_issues = [
+        {
+            "location": ".".join(str(part) for part in issue["loc"]),
+            "message": issue["msg"],
+            "type": issue["type"],
+        }
+        for issue in exc.errors()
+    ]
+    return JSONResponse(
+        {"error": "Request validation failed", "details": validation_issues},
+        status_code=422,
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    return JSONResponse({"error": str(exc.detail)}, status_code=exc.status_code, headers=exc.headers)
+
+
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
-    return JSONResponse({"error": str(exc)}, status_code=500)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled API error on %s", request.url.path, exc_info=exc)
+    return JSONResponse({"error": "Internal server error"}, status_code=500)
 
 
 @app.get("/api/health")
-def health():
+def health() -> dict[str, bool]:
     return {"ok": True, "usingDevAccessKey": get_settings().is_using_dev_access_key}
 
 
@@ -53,6 +80,7 @@ app.include_router(daily_log.router)
 app.include_router(tasks.router)
 app.include_router(calendar_events.router)
 app.include_router(habits.router)
+app.include_router(history.router)
 app.include_router(objectives.router)
 app.include_router(settings_router.router)
 app.include_router(time_allocation.router)

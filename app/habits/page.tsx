@@ -1,18 +1,22 @@
 import { AppShell } from "@/components/AppShell";
+import { parseHabitTrackerData } from "@/features/habits/api/habitsApi";
 import { requireUser } from "@/lib/auth";
 import { toDateKey } from "@/lib/dates";
-import { getHabitTrackerData } from "@/lib/habits";
-import { HabitsClient } from "./HabitsClient";
+import { HabitsClient } from "@/features/habits/components/HabitsClient";
+import { requestInternalApiJson } from "@/lib/server/internalApiClient";
 
 export default async function HabitsPage({
   searchParams
 }: {
   searchParams?: Promise<{ date?: string }>;
 }) {
-  const user = await requireUser();
+  await requireUser();
   const params = await searchParams;
   const date = params?.date ?? toDateKey();
-  const data = await getHabitTrackerData(user.id, date);
+  const data = await requestInternalApiJson(
+    `/api/habits?date=${encodeURIComponent(date)}`,
+    parseHabitTrackerData
+  );
 
   return (
     <AppShell wide>

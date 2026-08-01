@@ -12,15 +12,16 @@ from sqlalchemy.orm import Session
 
 from ..models import CalendarEvent, DailyLog
 from .dates import add_days, get_iso_week_id, get_week_date_keys, iso_datetime, parse_date_key, to_date_key
+from .numbers import javascript_round
 from .todo_metrics import get_calendar_context, get_todo_metrics
 
 
 def clamp_score(score: float) -> int:
-    return max(0, min(100, round(score)))
+    return max(0, min(100, javascript_round(score)))
 
 
 def clamp_count(count: int, maximum: int = 7) -> int:
-    return max(0, min(maximum, round(count)))
+    return max(0, min(maximum, javascript_round(count)))
 
 
 def weighted_average(parts: list[tuple[float | None, float]]) -> float | None:
@@ -101,7 +102,7 @@ def compute_risk_score(
         risk += 14
     elif calendar["maxImpact"] == "HIGH":
         risk += 9
-    risk += min(8, round(calendar["averageStress"] / 18))
+    risk += min(8, javascript_round(calendar["averageStress"] / 18))
     if (previous_risk_delta or 0) > 0:
         risk += 4
     if (previous_risk_acceleration or 0) > 0:
@@ -131,7 +132,7 @@ def compute_weekly_summary(db: Session, user_id: str, week_id: str | None = None
     existing = {log.date.isoformat() for log in logs}
 
     def avg(values: list[int]) -> int | None:
-        return None if not values else round(sum(values) / len(values))
+        return None if not values else javascript_round(sum(values) / len(values))
 
     def collect(selector) -> list[int]:
         return [selector(log) for log in logs if selector(log) is not None]
@@ -270,8 +271,8 @@ def build_weekly_json_export(db: Session, user_id: str, week_id: str | None = No
                 "calendar_context": {
                     "active_phase": calendar["activePhase"],
                     "high_impact_events_next_7d": calendar["highImpactEventsNext7d"],
-                    "expected_stress_load": round(calendar["averageStress"]),
-                    "expected_preparation_load": round(calendar["averagePreparationLoad"]),
+                    "expected_stress_load": javascript_round(calendar["averageStress"]),
+                    "expected_preparation_load": javascript_round(calendar["averagePreparationLoad"]),
                 },
                 "computed_scores": {
                     "state_score": log.stateScore if log else None,
@@ -303,8 +304,8 @@ def build_weekly_json_export(db: Session, user_id: str, week_id: str | None = No
         "calendar_context": {
             "active_phase": summary["calendarContext"]["activePhase"],
             "high_impact_events_next_7d": summary["calendarContext"]["highImpactEventsNext7d"],
-            "expected_stress_load": round(summary["calendarContext"]["averageStress"]),
-            "expected_preparation_load": round(summary["calendarContext"]["averagePreparationLoad"]),
+            "expected_stress_load": javascript_round(summary["calendarContext"]["averageStress"]),
+            "expected_preparation_load": javascript_round(summary["calendarContext"]["averagePreparationLoad"]),
         },
         "weekly_summary": {
             "avg_state_score": summary["avgStateScore"],

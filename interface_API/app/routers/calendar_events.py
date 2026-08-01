@@ -1,14 +1,14 @@
 from datetime import datetime, time, timedelta
 
-from fastapi import APIRouter, Body, Depends, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..contracts.calendar_events import CalendarEventCreateRequest, CalendarEventUpdateRequest
 from ..database import get_db
 from ..models import CalendarEvent, User
 from ..security import get_current_user
-from ..core.dates import add_days, iso_datetime, parse_date_key, parse_iso_datetime, to_date_key
+from ..core.dates import add_days, iso_datetime, parse_date_key, to_date_key, to_utc_naive
 from ..core.scoring import recompute_around_date
 
 router = APIRouter(prefix="/api/calendar-events", tags=["calendar-events"])
@@ -55,23 +55,21 @@ def list_events(
 
 @router.post("")
 def create_event(
-    body: dict = Body(...),
+    body: CalendarEventCreateRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    start = parse_iso_datetime(body["start"])
-    end = parse_iso_datetime(body["end"]) if body.get("end") else start + timedelta(hours=1)
+    start = to_utc_naive(body.start)
+    end = to_utc_naive(body.end) if body.end else start + timedelta(hours=1)
     event = CalendarEvent(
         userId=user.id,
-        title=body.get("title") or "Untitled event",
-        type=str(body.get("type") or "PERSONAL").upper(),
+        title=body.title or "Untitled event",
+        type=body.type.value,
         start=start,
         end=end,
-        impact=str(body.get("impact") or "MEDIUM").upper(),
-        expectedStress=body.get("expectedStress") if body.get("expectedStress") is not None else 50,
-        expectedPreparationLoad=body.get("expectedPreparationLoad")
-        if body.get("expectedPreparationLoad") is not None
-        else 50,
+        impact=body.impact.value,
+        expectedStress=body.expected_stress,
+        expectedPreparationLoad=body.expected_preparation_load,
     )
     db.add(event)
     db.flush()
@@ -81,31 +79,33 @@ def create_event(
 
 @router.patch("")
 def update_event(
-    body: dict = Body(...),
+    body: CalendarEventUpdateRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     existing = db.execute(
-        select(CalendarEvent).where(CalendarEvent.id == body.get("id"), CalendarEvent.userId == user.id)
+        select(CalendarEvent).where(CalendarEvent.id == body.id, CalendarEvent.userId == user.id)
     ).scalar_one_or_none()
     if existing is None:
-        return JSONResponse({"error": "Event not found"}, status_code=404)
+        raise HTTPException(status_code=404, detail="Event not found")
 
     previous_start_key = existing.start.date().isoformat()
-    if body.get("title") is not None:
-        existing.title = body["title"]
-    if body.get("type"):
-        existing.type = str(body["type"]).upper()
-    if body.get("start"):
-        existing.start = parse_iso_datetime(body["start"])
-    if body.get("end"):
-        existing.end = parse_iso_datetime(body["end"])
-    if body.get("impact"):
-        existing.impact = str(body["impact"]).upper()
-    if body.get("expectedStress") is not None:
-        existing.expectedStress = body["expectedStress"]
-    if body.get("expectedPreparationLoad") is not None:
-        existing.expectedPreparationLoad = body["expectedPreparationLoad"]
+    next_start = to_utc_naive(body.start) if body.start else existing.start
+    next_end = to_utc_naive(body.end) if body.end else existing.end
+    if next_end < next_start:
+        raise HTTPException(status_code=422, detail="Event end must be after its start")
+    if body.title is not None:
+        existing.title = body.title
+    if body.type is not None:
+        existing.type = body.type.value
+    existing.start = next_start
+    existing.end = next_end
+    if body.impact is not None:
+        existing.impact = body.impact.value
+    if body.expected_stress is not None:
+        existing.expectedStress = body.expected_stress
+    if body.expected_preparation_load is not None:
+        existing.expectedPreparationLoad = body.expected_preparation_load
     db.flush()
     recompute_around_date(db, user.id, previous_start_key)
     recompute_around_date(db, user.id, existing.start.date().isoformat())
@@ -119,12 +119,12 @@ def delete_event(
     db: Session = Depends(get_db),
 ):
     if not id:
-        return JSONResponse({"error": "Missing event id"}, status_code=400)
+        raise HTTPException(status_code=400, detail="Missing event id")
     existing = db.execute(
         select(CalendarEvent).where(CalendarEvent.id == id, CalendarEvent.userId == user.id)
     ).scalar_one_or_none()
     if existing is None:
-        return JSONResponse({"error": "Event not found"}, status_code=404)
+        raise HTTPException(status_code=404, detail="Event not found")
     start_key = existing.start.date().isoformat()
     db.delete(existing)
     db.flush()

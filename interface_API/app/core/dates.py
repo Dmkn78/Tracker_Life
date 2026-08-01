@@ -71,6 +71,11 @@ def iso_datetime(value: datetime | None) -> str | None:
 def parse_iso_datetime(value: str) -> datetime:
     """Parse an ISO string (with optional Z / offset) to a naive UTC datetime."""
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if parsed.tzinfo is not None:
-        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
-    return parsed
+    return to_utc_naive(parsed)
+
+
+def to_utc_naive(value: datetime) -> datetime:
+    """Normalize an aware datetime to naive UTC for the Prisma-owned schema."""
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)

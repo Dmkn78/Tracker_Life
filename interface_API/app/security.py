@@ -8,6 +8,7 @@ Next.js app remain valid against this API and vice versa.
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -52,19 +53,26 @@ def decode_session(token: str | None) -> str | None:
     """Return the user id when the token is valid, otherwise None."""
     if not token or "." not in token:
         return None
-    body, sig = token.split(".", 1)
-    if not body or not sig:
-        return None
-    expected = _sign(body)
-    if not hmac.compare_digest(sig.encode("ascii"), expected.encode("ascii")):
-        return None
     try:
+        body, sig = token.split(".", 1)
+        if not body or not sig:
+            return None
+        expected = _sign(body)
+        if not hmac.compare_digest(sig.encode("ascii"), expected.encode("ascii")):
+            return None
         payload = json.loads(_b64url_decode(body))
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeError, binascii.Error):
+        return None
+
+    if not isinstance(payload, dict):
         return None
     user_id = payload.get("userId")
-    exp = payload.get("exp", 0)
-    if not user_id or exp < int(time.time() * 1000):
+    exp = payload.get("exp")
+    if not isinstance(user_id, str) or not user_id:
+        return None
+    if isinstance(exp, bool) or not isinstance(exp, (int, float)):
+        return None
+    if exp < int(time.time() * 1000):
         return None
     return user_id
 

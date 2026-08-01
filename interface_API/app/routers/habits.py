@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Body, Depends, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from ..contracts.habits import HabitCreateRequest, HabitUpdateRequest
 from ..database import get_db
 from ..models import Habit, RoutineBlock, User
 from ..security import get_current_user
@@ -40,18 +40,18 @@ def get_habits(
 
 @router.post("")
 def create_habit(
-    body: dict = Body(...),
+    body: HabitCreateRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     habit = Habit(
         userId=user.id,
-        name=body.get("name") or "New habit",
-        category=body.get("category") or "routine",
-        description=body.get("description"),
-        targetTime=body.get("targetTime"),
-        defaultExpectedMinutes=body.get("defaultExpectedMinutes") or 0,
-        sortOrder=body.get("sortOrder") if body.get("sortOrder") is not None else 99,
+        name=body.name or "New habit",
+        category=body.category or "routine",
+        description=body.description,
+        targetTime=body.target_time,
+        defaultExpectedMinutes=body.default_expected_minutes,
+        sortOrder=body.sort_order,
         source="manual",
     )
     db.add(habit)
@@ -61,37 +61,47 @@ def create_habit(
 
 @router.patch("")
 def update_habit(
-    body: dict = Body(...),
+    body: HabitUpdateRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if body.get("kind") == "checkin":
-        date_key = body.get("date") or to_date_key()
+    if body.kind == "checkin":
+        date_key = body.date.isoformat() if body.date else to_date_key()
+        habit = db.execute(
+            select(Habit).where(Habit.id == body.habit_id, Habit.userId == user.id)
+        ).scalar_one_or_none()
+        if habit is None:
+            raise HTTPException(status_code=400, detail="Invalid habitId")
         upsert_habit_checkin(
             db,
             user_id=user.id,
-            habit_id=body["habitId"],
+            habit_id=body.habit_id or "",
             date_key=date_key,
-            status=body.get("status"),
-            actual_minutes=body.get("actualMinutes"),
-            note=body.get("note"),
+            status=body.status,
+            actual_minutes=body.actual_minutes,
+            note=body.note,
         )
         return get_habit_tracker_data(db, user.id, date_key)
 
     existing = db.execute(
-        select(Habit).where(Habit.id == body.get("id"), Habit.userId == user.id)
+        select(Habit).where(Habit.id == body.id, Habit.userId == user.id)
     ).scalar_one_or_none()
     if existing is None:
-        return JSONResponse({"error": "Habit not found"}, status_code=404)
-    for field in ("name", "category", "description", "targetTime"):
-        if body.get(field) is not None:
-            setattr(existing, field, body[field])
-    if body.get("defaultExpectedMinutes") is not None:
-        existing.defaultExpectedMinutes = body["defaultExpectedMinutes"]
-    if body.get("sortOrder") is not None:
-        existing.sortOrder = body["sortOrder"]
-    if body.get("active") is not None:
-        existing.active = body["active"]
+        raise HTTPException(status_code=404, detail="Habit not found")
+    if body.name is not None:
+        existing.name = body.name
+    if body.category is not None:
+        existing.category = body.category
+    if body.description is not None:
+        existing.description = body.description
+    if body.target_time is not None:
+        existing.targetTime = body.target_time
+    if body.default_expected_minutes is not None:
+        existing.defaultExpectedMinutes = body.default_expected_minutes
+    if body.sort_order is not None:
+        existing.sortOrder = body.sort_order
+    if body.active is not None:
+        existing.active = body.active
     db.flush()
     return {"habit": serialize_habit(existing)}
 
@@ -104,12 +114,12 @@ def delete_habit(
     db: Session = Depends(get_db),
 ):
     if not id:
-        return JSONResponse({"error": "Missing habit id"}, status_code=400)
+        raise HTTPException(status_code=400, detail="Missing habit id")
     existing = db.execute(
         select(Habit).where(Habit.id == id, Habit.userId == user.id)
     ).scalar_one_or_none()
     if existing is None:
-        return JSONResponse({"error": "Habit not found"}, status_code=404)
+        raise HTTPException(status_code=404, detail="Habit not found")
 
     db.execute(
         update(RoutineBlock)

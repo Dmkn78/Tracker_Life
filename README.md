@@ -1,71 +1,39 @@
 # Life Regime Tracker
 
-Low-friction personal tracking MVP built with Next.js, React, TypeScript, Tailwind CSS, PostgreSQL, Prisma, and signed httpOnly cookie authentication.
+Life Regime Tracker est une application personnelle de suivi quotidien. Elle réunit journal de journée, tâches, calendrier, habitudes, objectifs, allocation du temps, historique, indicateurs de trajectoire et transcription vocale locale.
 
-## Local Setup
+Le projet est organisé en quatre processus ou services :
 
-1. Copy `.env.example` to `.env`.
-2. Set a long private `APP_ACCESS_KEY` and `AUTH_SECRET`.
-3. Start PostgreSQL:
+- l’interface web Next.js/React sur le port `3000` ;
+- l’API métier FastAPI sur le port `8000` ;
+- le service local Whisper sur le port `8001` ;
+- PostgreSQL sur le port `5432`.
 
-```powershell
-docker compose up -d
-```
+FastAPI est la source unique de logique métier. Next.js rend l’interface, gère le cookie de session du navigateur et expose des proxies same-origin très minces. Prisma possède le schéma et les migrations PostgreSQL ; SQLAlchemy permet à FastAPI d’utiliser ce même schéma.
 
-4. Apply the schema:
+## Par où commencer ?
 
-```powershell
-pnpm prisma:migrate --name init
-```
+La documentation complète se trouve dans [`docs/README.md`](docs/README.md).
 
-5. Start the app:
+- Première installation : [`docs/01-DEBUTER.md`](docs/01-DEBUTER.md)
+- Notions de programmation : [`docs/02-FONDAMENTAUX-DU-CODE.md`](docs/02-FONDAMENTAUX-DU-CODE.md)
+- Architecture : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- Guide de maintenance : [`docs/08-MAINTENANCE-ET-REGLES.md`](docs/08-MAINTENANCE-ET-REGLES.md)
 
-```powershell
-pnpm dev
-```
+## Démarrage local rapide sous Windows
 
-## If Node.js/pnpm Are Not Installed Globally
+1. Copier `.env.example` vers `.env` et remplacer les secrets d’exemple.
+2. Démarrer PostgreSQL avec `docker compose up -d`.
+3. Installer les dépendances avec `pnpm install` puis créer la base avec `pnpm prisma:migrate --name init`.
+4. Installer les dépendances Python décrites dans le guide de démarrage.
+5. Lancer l’ensemble avec `.\scripts\dev.ps1` ou `.\scripts\dev.cmd`.
 
-This Codex workspace includes helper scripts that call the bundled Node.js runtime used while building the app:
-
-```powershell
-cd H:\CYTECHDATA\Documents\interface
-.\scripts\prisma-migrate.ps1 -Name init
-.\scripts\dev.ps1
-```
-
-If PowerShell blocks `.ps1` scripts on your machine, use the `.cmd` wrappers instead:
+La commande de vérification globale est :
 
 ```powershell
-cd H:\CYTECHDATA\Documents\interface
-.\scripts\prisma-migrate.cmd init
-.\scripts\dev.cmd
+pnpm check
 ```
 
-These scripts solve `pnpm : The term 'pnpm' is not recognized`. They do not install PostgreSQL; the database still needs to be running at the `DATABASE_URL` in `.env`.
+Elle exécute le contrôle TypeScript, les tests de l’API Python et le build de production Next.js.
 
-## Whisper Service
-
-Voice transcription is wired to a local FastAPI service.
-
-```powershell
-python -m pip install -r services/requirements.txt
-.\scripts\start-whisper-service.cmd
-```
-
-The Next.js app calls `/api/transcribe`, which forwards the audio file to the Python service and returns the transcript into `DailyLog.voiceTranscript`.
-
-When no `APP_ACCESS_KEY` is set, development uses `dev-access-key`. Do not use that fallback with real data.
-
-## MVP Scope
-
-- Home dashboard with date, main task, progress, next event, log status, and fast actions.
-- Daily Log with sliders, yes/no training, optional text, voice transcript placeholder, sleep intent, local draft restore, and server autosave.
-- To-do list with importance, productivity flag, completion buttons, and task status.
-- Calendar context events with type, impact, stress, and preparation load.
-- Rule-based execution, state, risk, risk delta, and risk acceleration scores.
-- History and weekly JSON export at `/api/reports/week?week_id=YYYY-Www`.
-
-## Prisma
-
-The app uses PostgreSQL through Prisma. The main models are `User`, `DailyLog`, `Task`, `CalendarEvent`, and `WeeklyReport`.
+> En développement uniquement, l’absence de `APP_ACCESS_KEY` active la clé `dev-access-key`. Cette valeur ne doit jamais protéger de vraies données ni être utilisée en production.

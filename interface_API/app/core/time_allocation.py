@@ -5,18 +5,20 @@ from __future__ import annotations
 import math
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from ..models import DailyPlanningContext, DailyTimeAllocation, TimeAllocationCategory
+from ..models import DailyPlanningContext, DailyTimeAllocation, TimeAllocationCategory, utcnow
 from .dates import add_days, get_iso_week_id, get_week_date_keys, parse_date_key, to_date_key
+from .numbers import javascript_round
 
 
 def _clamp(value: float, minimum: int = 0, maximum: int = 100) -> int:
-    return max(minimum, min(maximum, round(value)))
+    return max(minimum, min(maximum, javascript_round(value)))
 
 
 def _clamp_minutes(value: float) -> int:
-    return max(0, round(value))
+    return max(0, javascript_round(value))
 
 
 def allocate_minutes_from_weights(weights: list[float], total_minutes: int) -> list[int]:
@@ -119,9 +121,15 @@ def get_time_allocation_data(db: Session, user_id: str, date_key: str | None = N
         planned_minutes_manual = allocation.plannedMinutesManual if allocation else False
         planned_minutes_stored = allocation.plannedMinutes if allocation else 0
         planned_minutes = planned_minutes_stored if planned_minutes_manual else auto_planned_minutes
-        actual_weight = 0 if day_total == 0 else round(actual_minutes / day_total * 100)
+        actual_weight = (
+            0 if day_total == 0 else javascript_round(actual_minutes / day_total * 100)
+        )
         week_actual_minutes = week_by_category.get(category.id, 0)
-        week_weight = 0 if week_total == 0 else round(week_actual_minutes / week_total * 100)
+        week_weight = (
+            0
+            if week_total == 0
+            else javascript_round(week_actual_minutes / week_total * 100)
+        )
         rows.append(
             {
                 "id": category.id,
@@ -175,50 +183,51 @@ def upsert_daily_allocation(
     note: str | None = None,
 ) -> DailyTimeAllocation:
     day = parse_date_key(date_key)
-    existing = db.execute(
-        select(DailyTimeAllocation).where(
-            DailyTimeAllocation.userId == user_id,
-            DailyTimeAllocation.categoryId == category_id,
-            DailyTimeAllocation.date == day,
-        )
-    ).scalar_one_or_none()
-    if existing is None:
-        existing = DailyTimeAllocation(
-            userId=user_id,
-            categoryId=category_id,
-            date=day,
-            plannedMinutes=_clamp_minutes(planned_minutes or 0),
-            plannedMinutesManual=planned_minutes_manual or False,
-            actualMinutes=actual_minutes or 0,
-            note=note,
-        )
-        db.add(existing)
-    else:
-        if planned_minutes is not None:
-            existing.plannedMinutes = _clamp_minutes(planned_minutes)
-        if planned_minutes_manual is not None:
-            existing.plannedMinutesManual = planned_minutes_manual
-        if actual_minutes is not None:
-            existing.actualMinutes = actual_minutes
-        if note is not None:
-            existing.note = note
+    insert_statement = insert(DailyTimeAllocation).values(
+        userId=user_id,
+        categoryId=category_id,
+        date=day,
+        plannedMinutes=_clamp_minutes(planned_minutes or 0),
+        plannedMinutesManual=planned_minutes_manual or False,
+        actualMinutes=actual_minutes or 0,
+        note=note,
+    )
+    update_values: dict[str, object] = {"updatedAt": utcnow()}
+    if planned_minutes is not None:
+        update_values["plannedMinutes"] = _clamp_minutes(planned_minutes)
+    if planned_minutes_manual is not None:
+        update_values["plannedMinutesManual"] = planned_minutes_manual
+    if actual_minutes is not None:
+        update_values["actualMinutes"] = actual_minutes
+    if note is not None:
+        update_values["note"] = note
+    upsert_statement = insert_statement.on_conflict_do_update(
+        index_elements=[
+            DailyTimeAllocation.userId,
+            DailyTimeAllocation.categoryId,
+            DailyTimeAllocation.date,
+        ],
+        set_=update_values,
+    ).returning(DailyTimeAllocation)
+    allocation = db.execute(upsert_statement).scalar_one()
     db.flush()
-    return existing
+    return allocation
 
 
 def upsert_day_budget(db: Session, user_id: str, date_key: str, day_budget_minutes: int) -> DailyPlanningContext:
     day = parse_date_key(date_key)
-    existing = db.execute(
-        select(DailyPlanningContext).where(
-            DailyPlanningContext.userId == user_id, DailyPlanningContext.date == day
-        )
-    ).scalar_one_or_none()
-    if existing is None:
-        existing = DailyPlanningContext(
-            userId=user_id, date=day, dayBudgetMinutes=_clamp_minutes(day_budget_minutes)
-        )
-        db.add(existing)
-    else:
-        existing.dayBudgetMinutes = _clamp_minutes(day_budget_minutes)
+    insert_statement = insert(DailyPlanningContext).values(
+        userId=user_id,
+        date=day,
+        dayBudgetMinutes=_clamp_minutes(day_budget_minutes),
+    )
+    upsert_statement = insert_statement.on_conflict_do_update(
+        index_elements=[DailyPlanningContext.userId, DailyPlanningContext.date],
+        set_={
+            "dayBudgetMinutes": _clamp_minutes(day_budget_minutes),
+            "updatedAt": utcnow(),
+        },
+    ).returning(DailyPlanningContext)
+    planning_context = db.execute(upsert_statement).scalar_one()
     db.flush()
-    return existing
+    return planning_context

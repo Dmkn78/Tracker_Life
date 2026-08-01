@@ -12,11 +12,20 @@ type SessionPayload = {
 };
 
 function signingSecret() {
-  return process.env.AUTH_SECRET || process.env.APP_ACCESS_KEY || "dev-only-life-regime-secret";
+  const configuredSecret = process.env.AUTH_SECRET || process.env.APP_ACCESS_KEY;
+  if (configuredSecret) return configuredSecret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_SECRET and APP_ACCESS_KEY are not configured");
+  }
+  return "dev-only-life-regime-secret";
 }
 
 function accessKey() {
-  return process.env.APP_ACCESS_KEY || "dev-access-key";
+  if (process.env.APP_ACCESS_KEY) return process.env.APP_ACCESS_KEY;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("APP_ACCESS_KEY is not configured");
+  }
+  return "dev-access-key";
 }
 
 function encode(payload: SessionPayload) {
@@ -30,10 +39,20 @@ function decode(token?: string): SessionPayload | null {
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
   const expected = crypto.createHmac("sha256", signingSecret()).update(body).digest("base64url");
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
-  const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as SessionPayload;
-  if (!payload.userId || payload.exp < Date.now()) return null;
-  return payload;
+  const providedSignature = Buffer.from(sig);
+  const expectedSignature = Buffer.from(expected);
+  if (providedSignature.length !== expectedSignature.length) return null;
+  if (!crypto.timingSafeEqual(providedSignature, expectedSignature)) return null;
+  try {
+    const payload: unknown = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+    const session = payload as Partial<SessionPayload>;
+    if (typeof session.userId !== "string" || typeof session.exp !== "number") return null;
+    if (!Number.isFinite(session.exp) || session.exp < Date.now()) return null;
+    return { userId: session.userId, exp: session.exp };
+  } catch {
+    return null;
+  }
 }
 
 export async function ensureLocalUser() {

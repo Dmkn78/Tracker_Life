@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from ..contracts.settings import SettingsUpdateRequest
 from ..database import get_db
 from ..models import User
 from ..security import get_current_user
@@ -25,23 +26,14 @@ def get_settings_route(user: User = Depends(get_current_user)):
 
 @router.patch("")
 def update_settings(
-    body: dict = Body(...),
+    body: SettingsUpdateRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    def as_int(value):
-        try:
-            parsed = int(float(value))
-            return parsed
-        except (TypeError, ValueError):
-            return None
-
-    calorie_target = as_int(body.get("calorieTarget"))
-    sleep_delay = as_int(body.get("defaultSleepDelayMin"))
-    if calorie_target is not None:
-        user.calorieTarget = calorie_target
-    if sleep_delay is not None:
-        user.defaultSleepDelayMin = sleep_delay
+    if body.calorie_target is not None:
+        user.calorieTarget = body.calorie_target
+    if body.default_sleep_delay_min is not None:
+        user.defaultSleepDelayMin = body.default_sleep_delay_min
     db.add(user)
     db.flush()
     return _settings_payload(user)

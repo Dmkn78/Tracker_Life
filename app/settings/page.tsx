@@ -1,10 +1,13 @@
 import { AppShell } from "@/components/AppShell";
 import { WeeklyExportButton } from "@/components/WeeklyExportButton";
+import { parseSettingsResponse } from "@/features/settings/api/settingsApi";
 import { isUsingDevAccessKey, requireUser } from "@/lib/auth";
-import { SettingsClient } from "./SettingsClient";
+import { SettingsClient } from "@/features/settings/components/SettingsClient";
+import { requestInternalApiJson } from "@/lib/server/internalApiClient";
 
 export default async function SettingsPage() {
-  const user = await requireUser();
+  await requireUser();
+  const settings = await requestInternalApiJson("/api/settings", parseSettingsResponse);
 
   return (
     <AppShell>
@@ -17,8 +20,8 @@ export default async function SettingsPage() {
       </div>
 
       <SettingsClient
-        initialCalorieTarget={user.calorieTarget}
-        initialSleepDelay={user.defaultSleepDelayMin}
+        initialCalorieTarget={settings.calorieTarget}
+        initialSleepDelay={settings.defaultSleepDelayMin}
         usingDevAccessKey={isUsingDevAccessKey()}
       />
     </AppShell>

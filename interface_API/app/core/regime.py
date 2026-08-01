@@ -5,11 +5,13 @@ Logs are passed as dicts with the DailyLog field names (camelCase keys).
 
 from __future__ import annotations
 
+from .numbers import javascript_round
+
 REGIMES = ("stable", "productive", "pressure", "recovery", "drift", "burnout_risk", "chaotic")
 
 
 def _clamp(value: float, minimum: int = 0, maximum: int = 100) -> int:
-    return max(minimum, min(maximum, round(value)))
+    return max(minimum, min(maximum, javascript_round(value)))
 
 
 def _status(log: dict | None) -> str:

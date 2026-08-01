@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/AppShell";
 import { requireUser } from "@/lib/auth";
 import { toDateKey } from "@/lib/dates";
-import { CalendarClient } from "./CalendarClient";
+import { CalendarClient } from "@/features/calendar/components/CalendarClient";
 
 export default async function CalendarPage() {
   await requireUser();

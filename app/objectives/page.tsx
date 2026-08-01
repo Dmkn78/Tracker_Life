@@ -1,11 +1,12 @@
 import { AppShell } from "@/components/AppShell";
+import { parseObjectivesData } from "@/features/objectives/api/objectivesApi";
 import { requireUser } from "@/lib/auth";
-import { getObjectivesData } from "@/lib/objectives";
-import { ObjectivesClient } from "./ObjectivesClient";
+import { ObjectivesClient } from "@/features/objectives/components/ObjectivesClient";
+import { requestInternalApiJson } from "@/lib/server/internalApiClient";
 
 export default async function ObjectivesPage() {
-  const user = await requireUser();
-  const data = await getObjectivesData(user.id);
+  await requireUser();
+  const data = await requestInternalApiJson("/api/objectives", parseObjectivesData);
 
   return (
     <AppShell wide>

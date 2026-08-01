@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LockKeyhole } from "lucide-react";
 import { PrimaryButton } from "@/components/ui";
+import { loginSession } from "@/features/auth/api/sessionApi";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,18 +16,15 @@ export default function LoginPage() {
     event.preventDefault();
     setLoading(true);
     setError("");
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accessKey })
-    });
-    setLoading(false);
-    if (!response.ok) {
+    try {
+      await loginSession(accessKey);
+      router.push("/");
+      router.refresh();
+    } catch {
       setError("Access key was not accepted.");
-      return;
+    } finally {
+      setLoading(false);
     }
-    router.push("/");
-    router.refresh();
   }
 
   return (

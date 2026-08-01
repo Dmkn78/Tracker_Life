@@ -2,42 +2,32 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { Metric, Panel } from "@/components/ui";
 import { WeeklyExportButton } from "@/components/WeeklyExportButton";
+import { parseHistoryData } from "@/features/history/api/historyApi";
+import { normalizeHistoryFilter } from "@/features/history/domain/history";
 import { requireUser } from "@/lib/auth";
-import { addDays, getIsoWeekId, getWeekDateKeys, parseDateKey, toDateKey } from "@/lib/dates";
-import { computeWeeklySummary } from "@/lib/metrics";
-import { prisma } from "@/lib/prisma";
+import { getIsoWeekId } from "@/lib/dates";
+import { requestInternalApiJson } from "@/lib/server/internalApiClient";
 
 export default async function HistoryPage({
   searchParams
 }: {
   searchParams?: Promise<{ filter?: string }>;
 }) {
-  const user = await requireUser();
+  await requireUser();
   const params = await searchParams;
-  const filter = params?.filter ?? "last30";
-  const today = toDateKey();
-  const currentWeek = getWeekDateKeys(getIsoWeekId(today));
-  const dates =
-    filter === "week"
-      ? [...currentWeek].reverse()
-      : filter === "last7"
-        ? Array.from({ length: 7 }, (_, index) => addDays(today, -index))
-        : filter === "all"
-          ? null
-          : Array.from({ length: 30 }, (_, index) => addDays(today, -index));
-  const logs = await prisma.dailyLog.findMany({
-    where: dates ? { userId: user.id, date: { in: dates.map(parseDateKey) } } : { userId: user.id },
-    orderBy: { date: "desc" }
-  });
-  const byDate = new Map(logs.map((log) => [log.date.toISOString().slice(0, 10), log]));
-  const visibleDates = dates ?? logs.map((log) => log.date.toISOString().slice(0, 10));
-  const grouped = visibleDates.reduce<Record<string, string[]>>((acc, date) => {
+  const filter = normalizeHistoryFilter(params?.filter);
+  const data = await requestInternalApiJson(
+    `/api/history?filter=${encodeURIComponent(filter)}`,
+    parseHistoryData
+  );
+  const byDate = new Map(data.logs.map((log) => [log.date, log]));
+  const grouped = data.visibleDates.reduce<Record<string, string[]>>((acc, date) => {
     const week = getIsoWeekId(date);
     acc[week] = acc[week] ?? [];
     acc[week].push(date);
     return acc;
   }, {});
-  const weeklySummary = await computeWeeklySummary(user.id, getIsoWeekId(today));
+  const weeklySummary = data.weeklySummary;
 
   return (
     <AppShell>
@@ -91,8 +81,8 @@ export default async function HistoryPage({
                         <div className="min-w-0">
                           <h3 className="text-lg font-semibold text-slate-50">{date}</h3>
                           <p className="mt-1 text-sm text-slate-400">
-                            {log?.status.toLowerCase() ?? "missing"}
-                            {log ? ` · updated ${log.updatedAt.toLocaleString()}` : ""}
+                            {log?.status ?? "missing"}
+                            {log ? ` · updated ${new Date(log.updatedAt).toLocaleString()}` : ""}
                           </p>
                         </div>
                         <div className="grid min-w-0 grid-cols-2 gap-2 md:grid-cols-3 2xl:grid-cols-6">
@@ -101,7 +91,7 @@ export default async function HistoryPage({
                           <Metric label="Execution" value={String(log?.executionScore ?? "--")} />
                           <Metric label="State" value={String(log?.stateScore ?? "--")} tone="good" />
                           <Metric label="Risk" value={String(log?.riskScore ?? "--")} tone="warn" />
-                          <Metric label="Status" value={log?.status.toLowerCase() ?? "missing"} />
+                          <Metric label="Status" value={log?.status ?? "missing"} />
                         </div>
                       </div>
                     </Panel>

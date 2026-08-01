@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, time
+
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
@@ -17,13 +19,14 @@ from .dates import (
     month_year_label,
     parse_date_key,
 )
+from .numbers import javascript_round
 
 PRIORITY_RANK = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
 HORIZON_RANK = {"YEAR": 1, "QUARTER": 2, "MONTH": 3, "WEEK": 4}
 
 
 def format_minutes(total_minutes: float) -> str:
-    minutes = max(0, round(total_minutes))
+    minutes = max(0, javascript_round(total_minutes))
     if minutes == 0:
         return "0m"
     days, after_days = divmod(minutes, 60 * 24)
@@ -166,8 +169,6 @@ def get_objectives_data(db: Session, user_id: str, week_id: str | None = None) -
             .order_by(WeeklyPlanBlock.date.asc(), WeeklyPlanBlock.startTime.asc(), WeeklyPlanBlock.createdAt.asc())
         ).scalars()
     )
-    from datetime import datetime, time
-
     week_events = list(
         db.execute(
             select(CalendarEvent)
@@ -226,7 +227,9 @@ def get_objectives_data(db: Session, user_id: str, week_id: str | None = None) -
         if objective.status == "DONE":
             completion = 100
         elif linked_tasks:
-            completion = round(sum(task["completionPercent"] for task in linked_tasks) / len(linked_tasks))
+            completion = javascript_round(
+                sum(task["completionPercent"] for task in linked_tasks) / len(linked_tasks)
+            )
         else:
             completion = 0
         return {
