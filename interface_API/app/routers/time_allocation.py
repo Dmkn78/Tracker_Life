@@ -10,6 +10,7 @@ from ..database import get_db
 from ..models import TimeAllocationCategory, User
 from ..security import get_current_user
 from ..core.dates import iso_datetime, to_date_key
+from ..core.task_time_breakdown import get_task_time_breakdown
 from ..core.time_allocation import (
     get_time_allocation_data,
     upsert_daily_allocation,
@@ -17,6 +18,18 @@ from ..core.time_allocation import (
 )
 
 router = APIRouter(prefix="/api/time-allocation", tags=["time-allocation"])
+
+
+@router.get("/tasks")
+def get_task_breakdown(
+    period: str = Query(default="week"),
+    date: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if period not in ("week", "month"):
+        raise HTTPException(status_code=400, detail="period must be 'week' or 'month'")
+    return get_task_time_breakdown(db, user.id, period, date or to_date_key())
 
 
 def serialize_category(category: TimeAllocationCategory) -> dict:

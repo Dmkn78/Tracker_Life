@@ -1,18 +1,32 @@
 "use client";
 
-import { Ban, ChevronDown, Clock3, Mic, Moon, Save, Send, Square, Zap } from "lucide-react";
+import { Ban, ChevronDown, Clock3, Mic, Moon, Save, Send, Square, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DurationInput } from "@/components/DurationInput";
 import { ScoreCard } from "@/components/ScoreCard";
 import { SliderField } from "@/components/SliderField";
+import { TagsField } from "@/components/TagCompanyFields";
 import { ToggleField } from "@/components/ToggleField";
-import { FieldLabel, IconButton, Metric, Panel, PrimaryButton, SelectInput, TextArea } from "@/components/ui";
+import {
+  FieldLabel,
+  GhostButton,
+  IconButton,
+  Metric,
+  Panel,
+  PrimaryButton,
+  SecondaryButton,
+  SelectInput,
+  TextArea,
+  TextInput
+} from "@/components/ui";
 import {
   loadDailyLog,
   saveDailyLog,
   type DailyLogResponse,
   type DailyLogScores
 } from "@/features/daily-log/api/dailyLogApi";
+import { listTags } from "@/features/shared/api/tagsApi";
+import type { Tag } from "@/features/shared/domain/tagCompany";
 import {
   createDailyLogDraft,
   parseStoredDailyLogDraft,
@@ -46,6 +60,7 @@ export function DailyLogForm({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingError, setRecordingError] = useState("");
   const [transcriptionError, setTranscriptionError] = useState("");
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const loaded = useRef(false);
   const activeDateRef = useRef(selectedDate);
   const pendingAutosaveTimerRef = useRef<number | null>(null);
@@ -93,6 +108,14 @@ export function DailyLogForm({
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const requestController = new AbortController();
+    void listTags(requestController.signal)
+      .then(setAvailableTags)
+      .catch(() => undefined);
+    return () => requestController.abort();
   }, []);
 
   useEffect(() => {
@@ -284,13 +307,13 @@ export function DailyLogForm({
       <div className="mb-6 flex flex-col justify-between gap-3 md:flex-row md:items-end">
         <div>
           <p className="text-sm font-semibold uppercase text-accent">{formatDisplayDate(selectedDate)}</p>
-          <h1 className="mt-1 text-3xl font-semibold text-slate-50">Daily Log</h1>
-          <p className="mt-2 flex items-center gap-2 text-sm text-slate-400">
+          <h1 className="mt-1 text-3xl font-semibold text-ink">Daily Log</h1>
+          <p className="mt-2 flex items-center gap-2 text-sm text-muted">
             <Zap className="h-4 w-4 text-accent" />
             Quick pass: sliders, training, sleep. Full pass: add one short summary.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-md border border-line bg-panel px-3 py-2 text-sm font-semibold text-slate-300">
+        <div className="flex items-center gap-2 rounded-md border border-line bg-panel px-3 py-2 text-sm font-semibold text-muted">
           <Save className="h-4 w-4" />
           {autosaveLabel}
         </div>
@@ -323,6 +346,37 @@ export function DailyLogForm({
               placeholder="One sentence is enough."
             />
           </div>
+          <div className="space-y-4 border-t border-line pt-4">
+            <p className="text-sm font-semibold text-ink">Summary reflection</p>
+            <ListField
+              label="Wins"
+              placeholder="Something that went well"
+              values={log.wins}
+              onChange={(wins) => update({ wins })}
+            />
+            <ListField
+              label="Top 3 things to improve"
+              placeholder="One concrete improvement"
+              values={log.topImprovements}
+              onChange={(topImprovements) => update({ topImprovements })}
+              max={3}
+            />
+            <ListField
+              label="Blockers"
+              placeholder="What got in the way"
+              values={log.blockers}
+              onChange={(blockers) => update({ blockers })}
+            />
+            <ListField
+              label="Tomorrow's priorities"
+              placeholder="What matters most tomorrow"
+              values={log.tomorrowPriorities}
+              onChange={(tomorrowPriorities) => update({ tomorrowPriorities })}
+            />
+            <TagsField value={log.tags} onChange={(tags) => update({ tags })} tags={availableTags} />
+            <CustomFieldsEditor value={log.customFields} onChange={(customFields) => update({ customFields })} />
+          </div>
+
           <div>
             <FieldLabel>Voice transcript placeholder</FieldLabel>
             <TextArea
@@ -343,7 +397,7 @@ export function DailyLogForm({
                 if (file) update({ transcriptionStatus: "idle" });
               }}
             />
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-400">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted">
               <IconButton
                 type="button"
                 onClick={() => audioInputRef.current?.click()}
@@ -378,7 +432,7 @@ export function DailyLogForm({
             <button
               type="button"
               onClick={() => setAdvancedOpen((value) => !value)}
-              className="focus-ring flex w-full items-center justify-between rounded-md text-left text-sm font-semibold text-slate-200"
+              className="focus-ring flex w-full items-center justify-between rounded-md text-left text-sm font-semibold text-ink"
             >
               Advanced optional signal
               <ChevronDown className={`h-4 w-4 transition ${advancedOpen ? "rotate-180" : ""}`} />
@@ -483,7 +537,7 @@ export function DailyLogForm({
                 ))}
               </SelectInput>
             </div>
-            <p className="mt-3 flex items-center gap-2 text-sm text-slate-400">
+            <p className="mt-3 flex items-center gap-2 text-sm text-muted">
               <Clock3 className="h-4 w-4" />
               {log.sleepIntentClickedAt ? `Saved at ${new Date(log.sleepIntentClickedAt).toLocaleTimeString()}` : "Not marked yet"}
             </p>
@@ -498,6 +552,127 @@ export function DailyLogForm({
               Submit log
             </PrimaryButton>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ListField({
+  label,
+  placeholder,
+  values,
+  onChange,
+  max
+}: {
+  label: string;
+  placeholder: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+  max?: number;
+}) {
+  const [draft, setDraft] = useState("");
+  const atLimit = max !== undefined && values.length >= max;
+
+  function add() {
+    const trimmed = draft.trim();
+    if (!trimmed || atLimit) return;
+    onChange([...values, trimmed]);
+    setDraft("");
+  }
+
+  function remove(index: number) {
+    onChange(values.filter((_, current) => current !== index));
+  }
+
+  return (
+    <div>
+      <FieldLabel>
+        {label}
+        {max ? ` (max ${max})` : ""}
+      </FieldLabel>
+      <div className="mt-2 space-y-2">
+        {values.map((value, index) => (
+          <div key={`${value}-${index}`} className="flex items-center gap-2">
+            <span className="flex-1 truncate rounded-2xl bg-panel2/50 px-3 py-2 text-sm text-ink ring-1 ring-line">{value}</span>
+            <GhostButton type="button" onClick={() => remove(index)} className="min-h-9 min-w-9 shrink-0 rounded-2xl px-0">
+              <X className="h-4 w-4" />
+            </GhostButton>
+          </div>
+        ))}
+        {!atLimit ? (
+          <div className="flex items-center gap-2">
+            <TextInput
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  add();
+                }
+              }}
+              placeholder={placeholder}
+              className="flex-1"
+            />
+            <SecondaryButton type="button" onClick={add}>
+              Add
+            </SecondaryButton>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function CustomFieldsEditor({
+  value,
+  onChange
+}: {
+  value: Record<string, string>;
+  onChange: (value: Record<string, string>) => void;
+}) {
+  const [newKey, setNewKey] = useState("");
+  const [newValue, setNewValue] = useState("");
+  const entries = Object.entries(value);
+
+  function addField() {
+    const key = newKey.trim();
+    if (!key) return;
+    onChange({ ...value, [key]: newValue });
+    setNewKey("");
+    setNewValue("");
+  }
+
+  function removeField(key: string) {
+    const next = { ...value };
+    delete next[key];
+    onChange(next);
+  }
+
+  return (
+    <div>
+      <FieldLabel>Custom fields (optional)</FieldLabel>
+      <div className="mt-2 space-y-2">
+        {entries.map(([key, fieldValue]) => (
+          <div key={key} className="flex items-center gap-2">
+            <span className="w-1/3 shrink-0 truncate rounded-2xl bg-panel2/50 px-3 py-2 text-sm text-muted ring-1 ring-line">{key}</span>
+            <TextInput value={fieldValue} onChange={(event) => onChange({ ...value, [key]: event.target.value })} className="flex-1" />
+            <GhostButton type="button" onClick={() => removeField(key)} className="min-h-9 min-w-9 shrink-0 rounded-2xl px-0">
+              <X className="h-4 w-4" />
+            </GhostButton>
+          </div>
+        ))}
+        <div className="flex items-center gap-2">
+          <TextInput
+            value={newKey}
+            onChange={(event) => setNewKey(event.target.value)}
+            placeholder="Field name"
+            className="w-1/3 shrink-0"
+          />
+          <TextInput value={newValue} onChange={(event) => setNewValue(event.target.value)} placeholder="Value" className="flex-1" />
+          <SecondaryButton type="button" onClick={addField}>
+            Add
+          </SecondaryButton>
         </div>
       </div>
     </div>

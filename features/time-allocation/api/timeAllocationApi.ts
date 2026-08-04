@@ -6,6 +6,9 @@ import {
   requestJson
 } from "@/lib/http/apiClient";
 import type {
+  TaskTimeBreakdown,
+  TaskTimeBreakdownEntry,
+  TaskTimeBreakdownPeriod,
   TimeAllocationData,
   TimeAllocationDraft,
   TimeAllocationMetrics,
@@ -58,6 +61,54 @@ export function archiveTimeAllocationCategory(
     parseTimeAllocationData,
     { method: "DELETE" }
   );
+}
+
+export function loadTaskTimeBreakdown(
+  period: TaskTimeBreakdownPeriod,
+  date: string,
+  signal?: AbortSignal
+): Promise<TaskTimeBreakdown> {
+  const query = new URLSearchParams({ period, date });
+  return requestJson(
+    `/api/time-allocation/tasks?${query.toString()}`,
+    parseTaskTimeBreakdown,
+    { signal }
+  );
+}
+
+function parseTaskTimeBreakdown(payload: unknown): TaskTimeBreakdown {
+  const data = expectJsonObject(payload, "task time breakdown response");
+  const period = expectString(data.period, "task time breakdown response.period");
+  if (period !== "week" && period !== "month") {
+    throw new Error("task time breakdown response.period must be 'week' or 'month'");
+  }
+  if (!Array.isArray(data.byCompany)) throw new Error("task time breakdown response.byCompany must be an array");
+  if (!Array.isArray(data.byTag)) throw new Error("task time breakdown response.byTag must be an array");
+  return {
+    period,
+    rangeStart: expectString(data.rangeStart, "task time breakdown response.rangeStart"),
+    rangeEnd: expectString(data.rangeEnd, "task time breakdown response.rangeEnd"),
+    totalMinutes: expectNumber(data.totalMinutes, "task time breakdown response.totalMinutes"),
+    taskCount: expectNumber(data.taskCount, "task time breakdown response.taskCount"),
+    byCompany: data.byCompany.map((entry, index) =>
+      parseBreakdownEntry(entry, "companyId", `task time breakdown response.byCompany[${index}]`)
+    ),
+    noCompanyMinutes: expectNumber(data.noCompanyMinutes, "task time breakdown response.noCompanyMinutes"),
+    byTag: data.byTag.map((entry, index) =>
+      parseBreakdownEntry(entry, "tagId", `task time breakdown response.byTag[${index}]`)
+    ),
+    untaggedMinutes: expectNumber(data.untaggedMinutes, "task time breakdown response.untaggedMinutes")
+  };
+}
+
+function parseBreakdownEntry(payload: unknown, idField: "companyId" | "tagId", context: string): TaskTimeBreakdownEntry {
+  const entry = expectJsonObject(payload, context);
+  return {
+    id: expectString(entry[idField], `${context}.${idField}`),
+    name: expectString(entry.name, `${context}.name`),
+    color: expectString(entry.color, `${context}.color`),
+    minutes: expectNumber(entry.minutes, `${context}.minutes`)
+  };
 }
 
 function mutateTimeAllocation(payload: Record<string, unknown>): Promise<TimeAllocationData> {

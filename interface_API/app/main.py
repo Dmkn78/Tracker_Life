@@ -11,6 +11,7 @@ from .config import get_settings
 from .routers import (
     auth,
     calendar_events,
+    companies,
     daily_log,
     habits,
     history,
@@ -18,7 +19,9 @@ from .routers import (
     objectives,
     reports,
     settings as settings_router,
+    tags,
     tasks,
+    thinking_notes,
     time_allocation,
     transcribe,
 )
@@ -87,3 +90,6 @@ app.include_router(time_allocation.router)
 app.include_router(reports.router)
 app.include_router(transcribe.router)
 app.include_router(life_terminal.router)
+app.include_router(companies.router)
+app.include_router(tags.router)
+app.include_router(thinking_notes.router)

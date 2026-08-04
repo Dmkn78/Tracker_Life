@@ -48,10 +48,10 @@ export function DurationInput({
             event.currentTarget.blur();
           }
         }}
-        className="focus-ring mt-2 h-11 w-full rounded-md border border-line bg-shell px-3 font-mono text-slate-100 placeholder:text-slate-500"
+        className="focus-ring mt-2 h-11 w-full rounded-md border border-line bg-shell px-3 font-mono text-ink placeholder:text-muted"
         placeholder={placeholder}
       />
-      {showStored ? <p className="mt-1 font-mono text-[11px] text-slate-500">{value} min stored</p> : null}
+      {showStored ? <p className="mt-1 font-mono text-[11px] text-muted">{value} min stored</p> : null}
     </div>
   );
 }

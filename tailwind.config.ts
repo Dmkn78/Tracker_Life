@@ -1,5 +1,10 @@
 import type { Config } from "tailwindcss";
 
+/** Reads a `--color-x: R G B` custom property so Tailwind's alpha modifiers (`bg-accent/12`) keep working. */
+function withOpacity(cssVariable: string) {
+  return `rgb(var(${cssVariable}) / <alpha-value>)`;
+}
+
 const config: Config = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
@@ -7,22 +12,24 @@ const config: Config = {
     "./features/**/*.{js,ts,jsx,tsx,mdx}",
     "./lib/**/*.{js,ts,jsx,tsx,mdx}"
   ],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        ink: "#f8fafc",
-        muted: "#9ba3b4",
-        paper: "#0d1118",
-        shell: "#131923",
-        panel: "#161d29",
-        panel2: "#1b2230",
-        line: "#2a3140",
-        accent: "#8da2fb",
-        violet: "#8070ff",
-        blueglass: "#b8c7ff",
-        good: "#57c59a",
-        warn: "#f0c56b",
-        risk: "#f08b8f"
+        ink: withOpacity("--color-ink"),
+        muted: withOpacity("--color-muted"),
+        paper: withOpacity("--color-paper"),
+        shell: withOpacity("--color-shell"),
+        panel: withOpacity("--color-panel"),
+        panel2: withOpacity("--color-panel2"),
+        line: withOpacity("--color-line"),
+        accent: withOpacity("--color-accent"),
+        onaccent: withOpacity("--color-onaccent"),
+        violet: withOpacity("--color-violet"),
+        blueglass: withOpacity("--color-blueglass"),
+        good: withOpacity("--color-good"),
+        warn: withOpacity("--color-warn"),
+        risk: withOpacity("--color-risk")
       }
     }
   },

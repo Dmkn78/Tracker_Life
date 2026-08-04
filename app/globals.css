@@ -2,9 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Semantic color tokens as space-separated RGB triplets, consumed by
+ * tailwind.config.ts via rgb(var(--color-x) / <alpha-value>) so utilities
+ * like `bg-accent/12` keep working. `:root` holds the dark palette (the
+ * app's original, unchanged look) so nothing shifts before next-themes
+ * mounts; `.light` overrides it once the user switches themes.
+ */
 :root {
   color-scheme: dark;
+  --color-ink: 248 250 252;
+  --color-muted: 155 163 180;
+  --color-paper: 13 17 24;
+  --color-shell: 19 25 35;
+  --color-panel: 22 29 41;
+  --color-panel2: 27 34 48;
+  --color-line: 42 49 64;
+  --color-accent: 141 162 251;
+  --color-onaccent: 2 6 23;
+  --color-violet: 128 112 255;
+  --color-blueglass: 184 199 255;
+  --color-good: 87 197 154;
+  --color-warn: 240 197 107;
+  --color-risk: 240 139 143;
+  --body-gradient:
+    radial-gradient(circle at top left, rgba(141, 162, 251, 0.12), transparent 360px),
+    radial-gradient(circle at bottom right, rgba(120, 131, 155, 0.08), transparent 320px),
+    linear-gradient(180deg, #0d1118 0%, #111722 48%, #0d121b 100%);
   background: #0d1118;
+}
+
+:root.light {
+  /* Tuned for readability in direct sunlight: near-white surfaces, near-black
+     text, and every semantic color darkened enough to clear 4.5:1 on white. */
+  color-scheme: light;
+  --color-ink: 15 23 42;
+  --color-muted: 71 85 105;
+  --color-paper: 244 245 249;
+  --color-shell: 238 240 245;
+  --color-panel: 255 255 255;
+  --color-panel2: 248 249 252;
+  --color-line: 210 215 226;
+  --color-accent: 71 83 214;
+  --color-onaccent: 255 255 255;
+  --color-violet: 91 63 214;
+  --color-blueglass: 61 85 201;
+  --color-good: 21 122 84;
+  --color-warn: 138 91 10;
+  --color-risk: 194 59 65;
+  --body-gradient:
+    radial-gradient(circle at top left, rgba(71, 83, 214, 0.06), transparent 360px),
+    radial-gradient(circle at bottom right, rgba(71, 85, 105, 0.04), transparent 320px),
+    linear-gradient(180deg, #f8f9fc 0%, #f4f5f9 48%, #f1f2f7 100%);
+  background: #f4f5f9;
 }
 
 html {
@@ -27,11 +77,8 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  background:
-    radial-gradient(circle at top left, rgba(141, 162, 251, 0.12), transparent 360px),
-    radial-gradient(circle at bottom right, rgba(120, 131, 155, 0.08), transparent 320px),
-    linear-gradient(180deg, #0d1118 0%, #111722 48%, #0d121b 100%);
-  color: #f8fafc;
+  background: var(--body-gradient);
+  color: rgb(var(--color-ink));
   min-height: 100vh;
   overflow-x: clip;
 }
@@ -67,12 +114,12 @@ summary::-webkit-details-marker {
 }
 
 input[type="range"] {
-  accent-color: #8da2fb;
+  accent-color: rgb(var(--color-accent));
 }
 
 ::selection {
-  background: rgba(141, 162, 251, 0.28);
-  color: #f8fafc;
+  background: rgb(var(--color-accent) / 0.28);
+  color: rgb(var(--color-ink));
 }
 
 .focus-ring {
@@ -117,7 +164,7 @@ input[type="range"] {
 }
 
 .page-section {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgb(var(--color-line) / 0.6);
   padding-bottom: 1rem;
 }
 

@@ -1,6 +1,7 @@
 import {
   expectJsonObject,
   expectNumber,
+  expectOptionalNullableString,
   expectString,
   requestJson
 } from "@/lib/http/apiClient";
@@ -83,6 +84,9 @@ function parseCalendarEvent(payload: unknown, context: string): CalendarEvent {
     expectedPreparationLoad: expectNumber(
       event.expectedPreparationLoad,
       `${context}.expectedPreparationLoad`
-    )
+    ),
+    companyId: expectOptionalNullableString(event.companyId, `${context}.companyId`),
+    companyName: expectOptionalNullableString(event.companyName, `${context}.companyName`),
+    companyColor: expectOptionalNullableString(event.companyColor, `${context}.companyColor`)
   };
 }

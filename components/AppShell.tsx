@@ -11,14 +11,18 @@ import {
   Clock3,
   FolderKanban,
   Home,
+  Lightbulb,
   Menu,
   MonitorCog,
+  Moon,
   PieChart,
   Repeat2,
   Settings,
   SlidersHorizontal,
+  Sun,
   X
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
 const nav = [
@@ -27,6 +31,7 @@ const nav = [
   { href: "/life", label: "Life", icon: Activity },
   { href: "/daily-log", label: "Daily Log", icon: SlidersHorizontal },
   { href: "/todo", label: "To-do", icon: CheckSquare },
+  { href: "/thinking", label: "Thinking", icon: Lightbulb },
   { href: "/objectives", label: "Objectives", icon: FolderKanban },
   { href: "/time-allocation", label: "Time Allocation", icon: PieChart },
   { href: "/habits", label: "Habits", icon: Repeat2 },
@@ -36,6 +41,30 @@ const nav = [
 ];
 
 const storageKey = "life-regime:sidebar-collapsed";
+
+function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const isLight = mounted && theme === "light";
+
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(isLight ? "dark" : "light")}
+      className={`focus-ring flex h-11 items-center rounded-2xl bg-panel2/60 px-3 text-sm font-medium text-muted ring-1 ring-line transition hover:bg-panel2 hover:text-ink ${
+        collapsed ? "justify-center" : "gap-3"
+      }`}
+      aria-label={isLight ? "Switch to dark theme" : "Switch to light theme"}
+      title={isLight ? "Switch to dark theme" : "Switch to light theme"}
+    >
+      {isLight ? <Moon className="h-5 w-5 shrink-0" /> : <Sun className="h-5 w-5 shrink-0" />}
+      {!collapsed ? <span className="truncate">{isLight ? "Dark theme" : "Light theme"}</span> : null}
+    </button>
+  );
+}
 
 function NavLink({
   href,
@@ -60,8 +89,8 @@ function NavLink({
         collapsed ? "justify-center" : "gap-3"
       } ${
         active
-          ? "bg-white/[0.09] text-slate-50 ring-1 ring-white/10"
-          : "text-slate-400 hover:bg-white/[0.05] hover:text-slate-100"
+          ? "bg-panel text-ink ring-1 ring-line"
+          : "text-muted hover:bg-panel2/60 hover:text-ink"
       }`}
       title={label}
     >
@@ -88,14 +117,14 @@ function SidebarContent({
     <div className="flex h-full min-h-0 flex-col">
       <div className={`flex items-start ${collapsed && !mobile ? "justify-center" : "justify-between"} gap-3`}>
         <Link href="/" className="block min-w-0" onClick={onNavigate}>
-          <p className={`text-[11px] font-medium uppercase tracking-[0.2em] text-slate-500 ${collapsed && !mobile ? "text-center" : ""}`}>Life Regime</p>
-          {!collapsed || mobile ? <h1 className="mt-1 truncate text-xl font-semibold tracking-normal text-slate-50">Tracker</h1> : null}
+          <p className={`text-[11px] font-medium uppercase tracking-[0.2em] text-muted ${collapsed && !mobile ? "text-center" : ""}`}>Life Regime</p>
+          {!collapsed || mobile ? <h1 className="mt-1 truncate text-xl font-semibold tracking-normal text-ink">Tracker</h1> : null}
         </Link>
         {onToggle ? (
           <button
             type="button"
             onClick={onToggle}
-            className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/[0.04] text-slate-400 ring-1 ring-white/8 transition hover:bg-white/[0.07] hover:text-slate-100"
+            className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-panel2/60 text-muted ring-1 ring-line transition hover:bg-panel2 hover:text-ink"
             aria-label={collapsed ? "Expand sidebar" : mobile ? "Close menu" : "Collapse sidebar"}
           >
             {mobile ? <X className="h-4 w-4" /> : collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -117,9 +146,12 @@ function SidebarContent({
         ))}
       </nav>
 
-      <div className={`mt-auto rounded-[20px] bg-white/[0.045] p-3 ring-1 ring-white/8 ${collapsed && !mobile ? "hidden" : ""}`}>
-        <p className="text-xs font-medium uppercase text-slate-500">Mode</p>
-        <p className="mt-1 text-sm font-semibold text-slate-200">Calm operating system</p>
+      <div className="mt-auto grid gap-2">
+        <ThemeToggle collapsed={collapsed && !mobile} />
+        <div className={`rounded-[20px] bg-panel2/70 p-3 ring-1 ring-line ${collapsed && !mobile ? "hidden" : ""}`}>
+          <p className="text-xs font-medium uppercase text-muted">Mode</p>
+          <p className="mt-1 text-sm font-semibold text-ink">Calm operating system</p>
+        </div>
       </div>
     </div>
   );
@@ -148,7 +180,7 @@ export function AppShell({ children, wide = false }: { children: React.ReactNode
   return (
     <div className="min-h-screen overflow-x-clip">
       <aside
-        className={`fixed inset-y-0 left-0 z-30 hidden bg-shell/82 px-4 py-6 backdrop-blur-2xl ring-1 ring-inset ring-white/8 transition-[width] duration-200 md:block ${
+        className={`fixed inset-y-0 left-0 z-30 hidden bg-shell/82 px-4 py-6 backdrop-blur-2xl ring-1 ring-inset ring-line transition-[width] duration-200 md:block ${
           desktopCollapsed ? "w-24" : "w-64"
         }`}
       >
@@ -160,9 +192,9 @@ export function AppShell({ children, wide = false }: { children: React.ReactNode
       </aside>
 
       {mobileOpen ? (
-        <div className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm md:hidden">
+        <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden">
           <button type="button" className="absolute inset-0" aria-label="Close menu" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-[86vw] max-w-[320px] bg-shell/96 px-4 py-6 shadow-[0_20px_60px_rgba(0,0,0,0.45)] ring-1 ring-white/8">
+          <aside className="absolute inset-y-0 left-0 w-[86vw] max-w-[320px] bg-shell/96 px-4 py-6 shadow-[0_20px_60px_rgba(0,0,0,0.45)] ring-1 ring-line">
             <SidebarContent collapsed={false} pathname={pathname} onToggle={() => setMobileOpen(false)} onNavigate={() => setMobileOpen(false)} mobile />
           </aside>
         </div>
@@ -173,12 +205,12 @@ export function AppShell({ children, wide = false }: { children: React.ReactNode
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="focus-ring inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.05] text-slate-200 ring-1 ring-white/8 transition hover:bg-white/[0.08]"
+            className="focus-ring inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-panel2/70 text-ink ring-1 ring-line transition hover:bg-panel2"
             aria-label="Open navigation"
           >
             <Menu className="h-5 w-5" />
           </button>
-          <p className="truncate text-sm font-medium text-slate-400">{nav.find((item) => item.href === pathname)?.label ?? "Life Regime"}</p>
+          <p className="truncate text-sm font-medium text-muted">{nav.find((item) => item.href === pathname)?.label ?? "Life Regime"}</p>
         </div>
         <div className="min-w-0">{children}</div>
       </main>

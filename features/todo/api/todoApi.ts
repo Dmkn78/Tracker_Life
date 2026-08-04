@@ -6,6 +6,7 @@ import {
   expectString,
   requestJson
 } from "@/lib/http/apiClient";
+import type { Tag } from "@/features/shared/domain/tagCompany";
 import {
   TODO_IMPORTANCE_LEVELS,
   TODO_STATUSES,
@@ -13,8 +14,7 @@ import {
   type TodoImportance,
   type TodoScope,
   type TodoStatus,
-  type TodoTask,
-  type TodoTaskDraft
+  type TodoTask
 } from "../domain/todoTask";
 
 type ListTodoTasksInput = {
@@ -23,11 +23,33 @@ type ListTodoTasksInput = {
   signal?: AbortSignal;
 };
 
-type CreateTodoTasksInput = TodoTaskDraft & {
-  titles: string[];
+type ListTodoTasksRangeInput = {
+  from: string;
+  to: string;
+  signal?: AbortSignal;
 };
 
-type UpdateTodoTaskInput = { id: string } & Partial<Omit<TodoTask, "id">>;
+/** Wire shape for create/update: nullable fields (date, description, ...) can be
+ * explicitly cleared with `null`, `undefined` simply omits the key. */
+export type TaskWritePayload = {
+  title?: string;
+  description?: string | null;
+  date?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  objectiveId?: string | null;
+  companyName?: string | null;
+  tagNames?: string[];
+  importance?: TodoImportance;
+  productive?: boolean;
+  estimatedMinutes?: number;
+  completionPercent?: number;
+  status?: TodoStatus;
+};
+
+type CreateTodoTaskItem = TaskWritePayload & { title: string };
+type CreateTodoTasksInput = { items: CreateTodoTaskItem[] };
+type UpdateTodoTaskInput = { id: string } & TaskWritePayload & { sortOrder?: number };
 
 export function listTodoTasks({
   date,
@@ -35,6 +57,17 @@ export function listTodoTasks({
   signal
 }: ListTodoTasksInput): Promise<TodoTask[]> {
   const query = new URLSearchParams({ scope, date });
+  return requestJson(`/api/tasks?${query.toString()}`, parseTodoTasksResponse, {
+    signal
+  });
+}
+
+export function listTodoTasksInRange({
+  from,
+  to,
+  signal
+}: ListTodoTasksRangeInput): Promise<TodoTask[]> {
+  const query = new URLSearchParams({ from, to });
   return requestJson(`/api/tasks?${query.toString()}`, parseTodoTasksResponse, {
     signal
   });
@@ -59,6 +92,20 @@ export function updateTodoTask(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input)
+  });
+}
+
+export function reorderTodoTasks(ids: string[]): Promise<void> {
+  return requestJson("/api/tasks/reorder", () => undefined, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids })
+  });
+}
+
+export function deleteTodoTask(id: string): Promise<void> {
+  return requestJson(`/api/tasks?id=${encodeURIComponent(id)}`, () => undefined, {
+    method: "DELETE"
   });
 }
 
@@ -103,15 +150,35 @@ function parseTodoTask(payload: unknown, context: string): TodoTask {
   return {
     id: expectString(task.id, `${context}.id`),
     title: expectString(task.title, `${context}.title`),
-    date: expectString(task.date, `${context}.date`),
+    description: expectOptionalNullableString(task.description, `${context}.description`) ?? null,
+    date: expectOptionalNullableString(task.date, `${context}.date`) ?? null,
+    startTime: expectOptionalNullableString(task.startTime, `${context}.startTime`) ?? null,
+    endTime: expectOptionalNullableString(task.endTime, `${context}.endTime`) ?? null,
     objectiveId: expectOptionalNullableString(task.objectiveId, `${context}.objectiveId`),
     objectiveTitle: expectOptionalNullableString(task.objectiveTitle, `${context}.objectiveTitle`),
+    companyId: expectOptionalNullableString(task.companyId, `${context}.companyId`),
+    companyName: expectOptionalNullableString(task.companyName, `${context}.companyName`),
+    companyColor: expectOptionalNullableString(task.companyColor, `${context}.companyColor`),
+    tags: parseTags(task.tags, `${context}.tags`),
     importance: expectTodoImportance(task.importance, `${context}.importance`),
     productive: expectBoolean(task.productive, `${context}.productive`),
     estimatedMinutes: expectNumber(task.estimatedMinutes, `${context}.estimatedMinutes`),
     completionPercent: expectNumber(task.completionPercent, `${context}.completionPercent`),
-    status: expectTodoStatus(task.status, `${context}.status`)
+    status: expectTodoStatus(task.status, `${context}.status`),
+    sortOrder: expectNumber(task.sortOrder, `${context}.sortOrder`)
   };
+}
+
+function parseTags(payload: unknown, context: string): Tag[] {
+  if (!Array.isArray(payload)) return [];
+  return payload.map((tag, index) => {
+    const record = expectJsonObject(tag, `${context}[${index}]`);
+    return {
+      id: expectString(record.id, `${context}[${index}].id`),
+      name: expectString(record.name, `${context}[${index}].name`),
+      color: expectString(record.color, `${context}[${index}].color`)
+    };
+  });
 }
 
 function expectTodoImportance(value: unknown, field: string): TodoImportance {

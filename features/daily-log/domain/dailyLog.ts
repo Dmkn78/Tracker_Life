@@ -27,6 +27,12 @@ export type DailyLogDraft = {
   mainBlocker: string;
   mainBlockerOtherText: string;
   improvementTomorrow: string;
+  wins: string[];
+  topImprovements: string[];
+  blockers: string[];
+  tomorrowPriorities: string[];
+  tags: string[];
+  customFields: Record<string, string>;
   textSummary: string;
   voiceTranscript: string;
   transcriptionStatus: "idle" | "uploading" | "transcribing" | "done" | "error";
@@ -68,6 +74,14 @@ const STRING_FIELDS = [
   "textSummary",
   "voiceTranscript"
 ] as const satisfies ReadonlyArray<keyof DailyLogDraft>;
+const STRING_ARRAY_FIELDS = [
+  "wins",
+  "topImprovements",
+  "blockers",
+  "tomorrowPriorities",
+  "tags"
+] as const satisfies ReadonlyArray<keyof DailyLogDraft>;
+const MAX_TOP_IMPROVEMENTS = 3;
 
 export function createDailyLogDraft(
   date: string,
@@ -92,6 +106,12 @@ export function createDailyLogDraft(
     mainBlocker: "none",
     mainBlockerOtherText: "",
     improvementTomorrow: "",
+    wins: [],
+    topImprovements: [],
+    blockers: [],
+    tomorrowPriorities: [],
+    tags: [],
+    customFields: {},
     textSummary: "",
     voiceTranscript: "",
     transcriptionStatus: "idle",
@@ -117,6 +137,12 @@ export function sanitizeDailyLogDraft(value: DailyLogDraft): DailyLogDraft {
     mainBlocker: blocker.selected,
     mainBlockerOtherText: value.mainBlockerOtherText ?? blocker.otherText,
     improvementTomorrow: value.improvementTomorrow ?? "",
+    wins: value.wins ?? [],
+    topImprovements: (value.topImprovements ?? []).slice(0, MAX_TOP_IMPROVEMENTS),
+    blockers: value.blockers ?? [],
+    tomorrowPriorities: value.tomorrowPriorities ?? [],
+    tags: value.tags ?? [],
+    customFields: value.customFields ?? {},
     textSummary: value.textSummary ?? "",
     voiceTranscript: value.voiceTranscript ?? "",
     transcriptionStatus: value.transcriptionStatus ?? "idle"
@@ -164,6 +190,24 @@ export function parseDailyLogFields(value: unknown): Partial<DailyLogDraft> {
     if (fieldValue === undefined || fieldValue === null) continue;
     if (typeof fieldValue !== "string") throw new Error(`${field} must be a string`);
     Object.assign(parsed, { [field]: fieldValue });
+  }
+  for (const field of STRING_ARRAY_FIELDS) {
+    const fieldValue = source[field];
+    if (fieldValue === undefined || fieldValue === null) continue;
+    if (!Array.isArray(fieldValue) || fieldValue.some((entry) => typeof entry !== "string")) {
+      throw new Error(`${field} must be an array of strings`);
+    }
+    Object.assign(parsed, { [field]: fieldValue as string[] });
+  }
+  if (source.customFields !== undefined && source.customFields !== null) {
+    if (typeof source.customFields !== "object" || Array.isArray(source.customFields)) {
+      throw new Error("customFields must be an object");
+    }
+    const entries = Object.entries(source.customFields as Record<string, unknown>);
+    if (entries.some(([, value]) => typeof value !== "string")) {
+      throw new Error("customFields values must be strings");
+    }
+    parsed.customFields = Object.fromEntries(entries) as Record<string, string>;
   }
   for (const field of ["trainingDone", "avoidedImportantTask"] as const) {
     const fieldValue = source[field];

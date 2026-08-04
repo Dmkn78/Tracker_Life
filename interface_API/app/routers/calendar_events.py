@@ -5,8 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..contracts.calendar_events import CalendarEventCreateRequest, CalendarEventUpdateRequest
+from ..core.tags_companies import resolve_company_id
 from ..database import get_db
-from ..models import CalendarEvent, User
+from ..models import CalendarEvent, Company, User
 from ..security import get_current_user
 from ..core.dates import add_days, iso_datetime, parse_date_key, to_date_key, to_utc_naive
 from ..core.scoring import recompute_around_date
@@ -14,9 +15,10 @@ from ..core.scoring import recompute_around_date
 router = APIRouter(prefix="/api/calendar-events", tags=["calendar-events"])
 
 
-def serialize_event(event: CalendarEvent | None) -> dict | None:
+def serialize_event(db: Session, event: CalendarEvent | None) -> dict | None:
     if event is None:
         return None
+    company = db.get(Company, event.companyId) if event.companyId else None
     return {
         "id": event.id,
         "userId": event.userId,
@@ -27,6 +29,9 @@ def serialize_event(event: CalendarEvent | None) -> dict | None:
         "end": iso_datetime(event.end),
         "expectedStress": event.expectedStress,
         "expectedPreparationLoad": event.expectedPreparationLoad,
+        "companyId": event.companyId,
+        "companyName": company.name if company else None,
+        "companyColor": company.color if company else None,
         "createdAt": iso_datetime(event.createdAt),
         "updatedAt": iso_datetime(event.updatedAt),
     }
@@ -50,7 +55,7 @@ def list_events(
             .order_by(CalendarEvent.start.asc())
         ).scalars()
     )
-    return {"events": [serialize_event(event) for event in events]}
+    return {"events": [serialize_event(db, event) for event in events]}
 
 
 @router.post("")
@@ -70,11 +75,12 @@ def create_event(
         impact=body.impact.value,
         expectedStress=body.expected_stress,
         expectedPreparationLoad=body.expected_preparation_load,
+        companyId=resolve_company_id(db, user.id, body.company_id, body.company_name),
     )
     db.add(event)
     db.flush()
     recompute_around_date(db, user.id, event.start.date().isoformat())
-    return {"event": serialize_event(event)}
+    return {"event": serialize_event(db, event)}
 
 
 @router.patch("")
@@ -106,10 +112,12 @@ def update_event(
         existing.expectedStress = body.expected_stress
     if body.expected_preparation_load is not None:
         existing.expectedPreparationLoad = body.expected_preparation_load
+    if "company_id" in body.model_fields_set or "company_name" in body.model_fields_set:
+        existing.companyId = resolve_company_id(db, user.id, body.company_id, body.company_name)
     db.flush()
     recompute_around_date(db, user.id, previous_start_key)
     recompute_around_date(db, user.id, existing.start.date().isoformat())
-    return {"event": serialize_event(existing)}
+    return {"event": serialize_event(db, existing)}
 
 
 @router.delete("")

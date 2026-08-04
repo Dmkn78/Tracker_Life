@@ -54,3 +54,24 @@ export type TimeAllocationDraft = {
   actualMinutes: number;
   color: string;
 };
+
+export type TaskTimeBreakdownPeriod = "week" | "month";
+
+export type TaskTimeBreakdownEntry = {
+  id: string;
+  name: string;
+  color: string;
+  minutes: number;
+};
+
+export type TaskTimeBreakdown = {
+  period: TaskTimeBreakdownPeriod;
+  rangeStart: string;
+  rangeEnd: string;
+  totalMinutes: number;
+  taskCount: number;
+  byCompany: TaskTimeBreakdownEntry[];
+  noCompanyMinutes: number;
+  byTag: TaskTimeBreakdownEntry[];
+  untaggedMinutes: number;
+};

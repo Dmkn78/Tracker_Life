@@ -33,9 +33,9 @@ function buildMonthGrid(selectedDate: string) {
 function statusTone(status?: DayLogStatus) {
   if (status === "submitted" || status === "analyzed") return "border-good/50 bg-good/10 text-good";
   if (status === "draft") return "border-accent/50 bg-accent/10 text-accent";
-  if (status === "skipped") return "border-slate-500 bg-slate-500/10 text-slate-300";
+  if (status === "skipped") return "border-line bg-panel2/40 text-muted";
   if (status === "missing") return "border-risk/45 bg-risk/10 text-risk";
-  return "border-line bg-shell text-slate-500";
+  return "border-line bg-shell text-muted";
 }
 
 export function DailyLogDatePicker({
@@ -61,7 +61,7 @@ export function DailyLogDatePicker({
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-accent">Daily Log Calendar</p>
-            <h2 className="text-xl font-semibold text-slate-50">{formatDisplayDate(selectedDate)}</h2>
+            <h2 className="text-xl font-semibold text-ink">{formatDisplayDate(selectedDate)}</h2>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -81,9 +81,9 @@ export function DailyLogDatePicker({
         </div>
       </div>
 
-      <div className="mt-4 rounded-md border border-line bg-[#090f1a] p-3">
+      <div className="mt-4 rounded-md border border-line bg-shell p-3">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-slate-200">{monthLabel(month)}</h3>
+          <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-ink">{monthLabel(month)}</h3>
           <div className="flex flex-wrap gap-2 font-mono text-[11px] uppercase">
             <span className="text-good">submitted</span>
             <span className="text-accent">draft</span>
@@ -92,7 +92,7 @@ export function DailyLogDatePicker({
         </div>
         <div className="grid grid-cols-7 gap-1">
           {weekDays.map((day) => (
-            <div key={day} className="px-2 py-1 text-center font-mono text-[11px] font-semibold uppercase text-slate-500">
+            <div key={day} className="px-2 py-1 text-center font-mono text-[11px] font-semibold uppercase text-muted">
               {day}
             </div>
           ))}

@@ -2,7 +2,9 @@
 
 import { CalendarPlus, X } from "lucide-react";
 import { SliderField } from "@/components/SliderField";
+import { CompanyField } from "@/components/TagCompanyFields";
 import { FieldLabel, IconButton, PrimaryButton, SelectInput, TextInput } from "@/components/ui";
+import type { Company } from "@/features/shared/domain/tagCompany";
 
 const eventTypes = ["exam", "interview", "deadline", "admin", "social", "training", "recovery", "travel", "personal"];
 const impacts = ["low", "medium", "high", "critical"];
@@ -15,6 +17,8 @@ export function CalendarEventForm({
   end,
   expectedStress,
   expectedPreparationLoad,
+  companyName,
+  companies,
   onChange,
   onSubmit,
   onClose
@@ -26,6 +30,8 @@ export function CalendarEventForm({
   end: string;
   expectedStress: number;
   expectedPreparationLoad: number;
+  companyName: string;
+  companies: Company[];
   onChange: (patch: Record<string, string | number>) => void;
   onSubmit: (event: React.FormEvent) => void;
   onClose?: () => void;
@@ -35,7 +41,7 @@ export function CalendarEventForm({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase text-accent">Context event</p>
-          <h2 className="mt-1 text-lg font-semibold text-slate-50">Create event</h2>
+          <h2 className="mt-1 text-lg font-semibold text-ink">Create event</h2>
         </div>
         {onClose ? (
           <IconButton type="button" onClick={onClose} title="Close">
@@ -97,6 +103,7 @@ export function CalendarEventForm({
           ))}
         </div>
       </div>
+      <CompanyField label="Company (optional)" value={companyName} onChange={(value) => onChange({ companyName: value })} companies={companies} />
       <SliderField label="Expected stress" value={expectedStress} onChange={(value) => onChange({ expectedStress: value })} />
       <SliderField
         label="Preparation load"

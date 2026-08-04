@@ -21,7 +21,7 @@ export function SliderField({
     <div>
       <div className="flex items-center justify-between gap-4">
         <FieldLabel>{label}</FieldLabel>
-        <span className="tabular-nums text-lg font-semibold text-slate-50">
+        <span className="tabular-nums text-lg font-semibold text-ink">
           {value}
           {suffix}
         </span>

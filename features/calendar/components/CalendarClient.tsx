@@ -1,18 +1,29 @@
 "use client";
 
-import { CalendarPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CalendarPlus, ListTodo } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarEventForm } from "@/components/CalendarEventForm";
-import { Panel, PrimaryButton } from "@/components/ui";
+import { Pill, Panel, PrimaryButton } from "@/components/ui";
 import {
   createCalendarEvent,
   listCalendarEvents
 } from "@/features/calendar/api/calendarEventsApi";
 import type { CalendarEvent } from "@/features/calendar/domain/calendarEvent";
+import { listCompanies } from "@/features/shared/api/companiesApi";
+import type { Company } from "@/features/shared/domain/tagCompany";
+import { listTodoTasksInRange } from "@/features/todo/api/todoApi";
+import type { TodoTask } from "@/features/todo/domain/todoTask";
+import { addDays } from "@/lib/dates";
 import { ApiError } from "@/lib/http/apiClient";
+
+type AgendaItem =
+  | { kind: "event"; sortKey: string; event: CalendarEvent }
+  | { kind: "task"; sortKey: string; task: TodoTask };
 
 export function CalendarClient({ today }: { today: string }) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [scheduledTasks, setScheduledTasks] = useState<TodoTask[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -23,19 +34,36 @@ export function CalendarClient({ today }: { today: string }) {
   const [end, setEnd] = useState(`${today}T10:00`);
   const [expectedStress, setExpectedStress] = useState(50);
   const [expectedPreparationLoad, setExpectedPreparationLoad] = useState(50);
+  const [companyName, setCompanyName] = useState("");
+
+  const rangeEnd = useMemo(() => addDays(today, 30), [today]);
 
   useEffect(() => {
     const requestController = new AbortController();
     setLoadError(null);
-    void listCalendarEvents(today, requestController.signal)
-      .then(setEvents)
+    void Promise.all([
+      listCalendarEvents(today, requestController.signal),
+      listTodoTasksInRange({ from: today, to: rangeEnd, signal: requestController.signal })
+    ])
+      .then(([loadedEvents, loadedTasks]) => {
+        setEvents(loadedEvents);
+        setScheduledTasks(loadedTasks.filter((task) => Boolean(task.date)));
+      })
       .catch((error: unknown) => {
         if (!requestController.signal.aborted) {
-          setLoadError(readApiErrorMessage(error, "Unable to load calendar events."));
+          setLoadError(readApiErrorMessage(error, "Unable to load the calendar."));
         }
       });
     return () => requestController.abort();
-  }, [today]);
+  }, [today, rangeEnd]);
+
+  useEffect(() => {
+    const requestController = new AbortController();
+    void listCompanies(requestController.signal)
+      .then(setCompanies)
+      .catch(() => undefined);
+    return () => requestController.abort();
+  }, []);
 
   async function addEvent(event: React.FormEvent) {
     event.preventDefault();
@@ -48,24 +76,35 @@ export function CalendarClient({ today }: { today: string }) {
         start: new Date(start).toISOString(),
         end: new Date(end).toISOString(),
         expectedStress,
-        expectedPreparationLoad
+        expectedPreparationLoad,
+        companyName: companyName.trim() || undefined
       });
-      setEvents((current) =>
-        [...current, createdEvent].sort((a, b) => a.start.localeCompare(b.start))
-      );
+      setEvents((current) => [...current, createdEvent]);
       setTitle("");
+      setCompanyName("");
       setOpen(false);
     } catch (error: unknown) {
       setSaveError(readApiErrorMessage(error, "Unable to create the calendar event."));
     }
   }
 
+  const agenda: AgendaItem[] = useMemo(() => {
+    const eventItems: AgendaItem[] = events.map((event) => ({ kind: "event", sortKey: event.start, event }));
+    const taskItems: AgendaItem[] = scheduledTasks.map((task) => ({
+      kind: "task",
+      sortKey: `${task.date}T${task.startTime ?? "00:00"}`,
+      task
+    }));
+    return [...eventItems, ...taskItems].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  }, [events, scheduledTasks]);
+
   return (
     <div>
       <div className="mb-6 flex flex-col justify-between gap-3 md:flex-row md:items-end">
         <div>
           <p className="text-sm font-semibold uppercase text-accent">Calendar context</p>
-          <h1 className="mt-1 text-3xl font-semibold text-slate-50">Events</h1>
+          <h1 className="mt-1 text-3xl font-semibold text-ink">Events</h1>
+          <p className="mt-1 text-sm text-muted">Scheduled tasks from To-do appear here automatically alongside standalone events.</p>
         </div>
         <PrimaryButton
           onClick={() => {
@@ -86,31 +125,71 @@ export function CalendarClient({ today }: { today: string }) {
                 {loadError}
               </p>
             </Panel>
-          ) : events.length === 0 ? (
+          ) : agenda.length === 0 ? (
             <Panel>
-              <p className="text-sm text-slate-400">No upcoming events in the next 30 days.</p>
+              <p className="text-sm text-muted">No upcoming events or scheduled tasks in the next 30 days.</p>
             </Panel>
           ) : null}
-          {events.map((event) => (
-            <Panel key={event.id}>
-              <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-50">{event.title}</h2>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {event.type} · {new Date(event.start).toLocaleString()} ·{" "}
-                    {new Date(event.end).toLocaleTimeString()}
-                  </p>
+          {agenda.map((item) =>
+            item.kind === "event" ? (
+              <Panel key={`event-${item.event.id}`}>
+                <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-lg font-semibold text-ink">{item.event.title}</h2>
+                      {item.event.companyName ? (
+                        <Pill style={{ backgroundColor: `${item.event.companyColor}22`, color: item.event.companyColor ?? undefined }}>
+                          {item.event.companyName}
+                        </Pill>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-sm text-muted">
+                      {item.event.type} · {new Date(item.event.start).toLocaleString()} ·{" "}
+                      {new Date(item.event.end).toLocaleTimeString()}
+                    </p>
+                  </div>
+                  <span className="rounded-md border border-line bg-shell px-3 py-1 text-sm font-semibold text-ink">
+                    {item.event.impact}
+                  </span>
                 </div>
-                <span className="rounded-md border border-line bg-shell px-3 py-1 text-sm font-semibold text-slate-200">
-                  {event.impact}
-                </span>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-400">
-                <span>Stress {event.expectedStress}/100</span>
-                <span>Prep {event.expectedPreparationLoad}/100</span>
-              </div>
-            </Panel>
-          ))}
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-muted">
+                  <span>Stress {item.event.expectedStress}/100</span>
+                  <span>Prep {item.event.expectedPreparationLoad}/100</span>
+                </div>
+              </Panel>
+            ) : (
+              <Panel key={`task-${item.task.id}`} className="ring-1 ring-accent/15">
+                <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Pill className="bg-accent/12 text-accent ring-accent/15">
+                        <ListTodo className="mr-1 inline h-3 w-3" />
+                        Task
+                      </Pill>
+                      <h2 className="text-lg font-semibold text-ink">{item.task.title}</h2>
+                      {item.task.companyName ? (
+                        <Pill style={{ backgroundColor: `${item.task.companyColor}22`, color: item.task.companyColor ?? undefined }}>
+                          {item.task.companyName}
+                        </Pill>
+                      ) : null}
+                      {item.task.tags.map((tag) => (
+                        <Pill key={tag.id} style={{ backgroundColor: `${tag.color}22`, color: tag.color }}>
+                          {tag.name}
+                        </Pill>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-sm text-muted">
+                      {item.task.date}
+                      {item.task.startTime ? ` · ${item.task.startTime}${item.task.endTime ? `–${item.task.endTime}` : ""}` : ""}
+                    </p>
+                  </div>
+                  <span className="rounded-md border border-line bg-shell px-3 py-1 text-sm font-semibold text-ink">
+                    {item.task.status.replace("_", " ")}
+                  </span>
+                </div>
+              </Panel>
+            )
+          )}
         </div>
       </div>
 
@@ -130,6 +209,8 @@ export function CalendarClient({ today }: { today: string }) {
               end={end}
               expectedStress={expectedStress}
               expectedPreparationLoad={expectedPreparationLoad}
+              companyName={companyName}
+              companies={companies}
               onClose={() => setOpen(false)}
               onSubmit={addEvent}
               onChange={(patch) => {
@@ -140,6 +221,7 @@ export function CalendarClient({ today }: { today: string }) {
                 if (typeof patch.end === "string") setEnd(patch.end);
                 if (typeof patch.expectedStress === "number") setExpectedStress(patch.expectedStress);
                 if (typeof patch.expectedPreparationLoad === "number") setExpectedPreparationLoad(patch.expectedPreparationLoad);
+                if (typeof patch.companyName === "string") setCompanyName(patch.companyName);
               }}
             />
           </Panel>

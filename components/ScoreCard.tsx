@@ -20,10 +20,10 @@ export function ScoreCard({
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase text-accent">Day Status</p>
-          <h2 className="mt-1 text-lg font-semibold text-slate-50">Computed signal</h2>
+          <h2 className="mt-1 text-lg font-semibold text-ink">Computed signal</h2>
         </div>
         {context ? (
-          <span className="rounded-md border border-line bg-shell px-2 py-1 text-xs font-semibold text-slate-300">
+          <span className="rounded-md border border-line bg-shell px-2 py-1 text-xs font-semibold text-muted">
             {context.replaceAll("_", " ")}
           </span>
         ) : null}

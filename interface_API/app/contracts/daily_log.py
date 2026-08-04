@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date as Date
 from datetime import datetime as DateTime
+from typing import Any
 
 from pydantic import Field
 
@@ -28,6 +29,12 @@ class DailyLogUpsertRequest(ApiRequest):
     avoided_important_task: bool | None = None
     main_blocker: str | None = None
     improvement_tomorrow: str | None = None
+    wins: list[str] | None = None
+    top_improvements: list[str] | None = Field(default=None, max_length=3)
+    blockers: list[str] | None = None
+    tomorrow_priorities: list[str] | None = None
+    tags: list[str] | None = None
+    custom_fields: dict[str, Any] | None = None
     sleep_intent_clicked_at: DateTime | None = None
     estimated_sleep_delay_min: int | None = Field(default=None, ge=0, le=1_440)
     text_summary: str | None = None

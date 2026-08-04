@@ -13,6 +13,8 @@ import {
   PrimaryButton,
   SecondaryButton,
   SectionHeader,
+  Segmented,
+  SegmentedButton,
   SoftPanel,
   TextArea,
   TextInput
@@ -23,6 +25,7 @@ import {
   saveDayBudget as updateDayBudget,
   saveTimeAllocationPortfolio
 } from "@/features/time-allocation/api/timeAllocationApi";
+import { TaskTimeBreakdownPanel } from "@/features/time-allocation/components/TaskTimeBreakdownPanel";
 import type {
   TimeAllocationData,
   TimeAllocationDraft,
@@ -35,6 +38,7 @@ const colors = ["#8da2fb", "#57c59a", "#f0c56b", "#f08b8f", "#76b2ff", "#9282ff"
 export function TimeAllocationClient({ initialData }: { initialData: TimeAllocationData }) {
   const [data, setData] = useState(initialData);
   const [date, setDate] = useState(initialData.date);
+  const [view, setView] = useState<"portfolio" | "tasks">("portfolio");
   const [drawer, setDrawer] = useState<{ mode: "create" | "edit"; draft: TimeAllocationDraft } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,103 +173,118 @@ export function TimeAllocationClient({ initialData }: { initialData: TimeAllocat
         </p>
       ) : null}
 
-      <SoftPanel className="p-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,220px)_minmax(0,280px)_auto] lg:items-end">
-          <div className="min-w-0">
-            <FieldLabel>Date</FieldLabel>
-            <TextInput
-              type="date"
-              value={date}
-              onChange={(event) => {
-                const nextDate = event.target.value;
-                setDate(nextDate);
-                load(nextDate);
-              }}
-              className="mt-2 min-w-0"
-            />
-          </div>
-          <DurationInput
-            label="Day budget"
-            value={data.dayBudgetMinutes}
-            onChange={(dayBudgetMinutes) => void saveDayBudget(dayBudgetMinutes)}
-            placeholder="12h"
-            showStored={false}
-          />
-          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            <Pill>{targetStatus}</Pill>
-            <Pill>{data.hasManualPlanOverrides ? "manual overrides" : "auto plan"}</Pill>
-          </div>
-        </div>
-      </SoftPanel>
+      <Segmented>
+        <SegmentedButton active={view === "portfolio"} onClick={() => setView("portfolio")}>
+          Portfolio
+        </SegmentedButton>
+        <SegmentedButton active={view === "tasks"} onClick={() => setView("tasks")}>
+          By task
+        </SegmentedButton>
+      </Segmented>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <Metric label="Day budget" value={formatDuration(data.dayBudgetMinutes)} />
-        <Metric label="Planned today" value={formatDuration(data.plannedMinutesTotal)} detail={`auto ${formatDuration(data.plannedMinutesAutoTotal)}`} tone={data.overBudgetMinutes > 0 ? "warn" : "neutral"} />
-        <Metric
-          label={data.overBudgetMinutes > 0 ? "Over budget" : "Remaining"}
-          value={formatDuration(data.overBudgetMinutes > 0 ? data.overBudgetMinutes : data.remainingBudgetMinutes)}
-          tone={data.overBudgetMinutes > 0 ? "warn" : "good"}
-        />
-        <Metric label="Logged today" value={formatDuration(data.actualMinutesTotal)} />
-        <Metric label="Target total" value={`${data.targetWeightTotal}%`} tone={data.targetWeightTotal === 100 ? "good" : "warn"} detail={`${data.rows.length} blocks`} />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[0.7fr_1.3fr]">
-        <SoftPanel className="p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <PieChart className="h-4 w-4 text-slate-400" />
-            <h2 className="text-lg font-semibold text-slate-100">Allocation overview</h2>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <PieBlock title="Target" data={targetPie} emptyText="Add target percentages to shape the portfolio." />
-            <PieBlock title="Actual today" data={actualPie} emptyText="Log time during the day to see the real allocation." />
-          </div>
-        </SoftPanel>
-
-        <SoftPanel className="p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-100">Active blocks</h2>
-            <span className="text-sm text-slate-400">{data.rows.length}</span>
-          </div>
-          {data.rows.length === 0 ? (
-            <EmptyState text="No active blocks yet. Add only the time buckets you actually want to manage." />
-          ) : (
-            <div className="space-y-2">
-              {data.rows.map((row: TimeAllocationRow) => (
-                <div
-                  key={row.id}
-                  className="rounded-[20px] bg-white/[0.03] px-4 py-3 text-left ring-1 ring-white/6 transition hover:bg-white/[0.05]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <button type="button" onClick={() => openEdit(row)} className="min-w-0 flex-1 text-left">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} />
-                        <p className="truncate text-base font-semibold text-slate-100">{row.name}</p>
-                      </div>
-                      {row.objective ? <p className="mt-1 line-clamp-2 text-sm text-slate-400">{row.objective}</p> : null}
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Pill>{row.targetWeight}% target</Pill>
-                        <Pill>{formatDuration(row.plannedMinutes)} planned</Pill>
-                        <Pill className={row.plannedMinutesManual ? "bg-white/[0.08] text-slate-100 ring-white/10" : ""}>
-                          {row.plannedMinutesManual ? "manual" : `${formatDuration(row.autoPlannedMinutes)} auto`}
-                        </Pill>
-                        <Pill>{formatDuration(row.actualMinutes)} real</Pill>
-                      </div>
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">{row.actualWeight}% actual</span>
-                      <GhostButton type="button" onClick={() => openEdit(row)} className="min-h-9 rounded-2xl bg-white/[0.03] px-3 ring-1 ring-white/8">
-                        <PencilLine className="h-4 w-4" />
-                        Edit
-                      </GhostButton>
-                    </div>
-                  </div>
-                </div>
-              ))}
+      {view === "tasks" ? (
+        <TaskTimeBreakdownPanel date={date} />
+      ) : (
+        <>
+          <SoftPanel className="p-4">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,220px)_minmax(0,280px)_auto] lg:items-end">
+              <div className="min-w-0">
+                <FieldLabel>Date</FieldLabel>
+                <TextInput
+                  type="date"
+                  value={date}
+                  onChange={(event) => {
+                    const nextDate = event.target.value;
+                    setDate(nextDate);
+                    load(nextDate);
+                  }}
+                  className="mt-2 min-w-0"
+                />
+              </div>
+              <DurationInput
+                label="Day budget"
+                value={data.dayBudgetMinutes}
+                onChange={(dayBudgetMinutes) => void saveDayBudget(dayBudgetMinutes)}
+                placeholder="12h"
+                showStored={false}
+              />
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <Pill>{targetStatus}</Pill>
+                <Pill>{data.hasManualPlanOverrides ? "manual overrides" : "auto plan"}</Pill>
+              </div>
             </div>
-          )}
-        </SoftPanel>
-      </div>
+          </SoftPanel>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <Metric label="Day budget" value={formatDuration(data.dayBudgetMinutes)} />
+            <Metric label="Planned today" value={formatDuration(data.plannedMinutesTotal)} detail={`auto ${formatDuration(data.plannedMinutesAutoTotal)}`} tone={data.overBudgetMinutes > 0 ? "warn" : "neutral"} />
+            <Metric
+              label={data.overBudgetMinutes > 0 ? "Over budget" : "Remaining"}
+              value={formatDuration(data.overBudgetMinutes > 0 ? data.overBudgetMinutes : data.remainingBudgetMinutes)}
+              tone={data.overBudgetMinutes > 0 ? "warn" : "good"}
+            />
+            <Metric label="Logged today" value={formatDuration(data.actualMinutesTotal)} />
+            <Metric label="Target total" value={`${data.targetWeightTotal}%`} tone={data.targetWeightTotal === 100 ? "good" : "warn"} detail={`${data.rows.length} blocks`} />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[0.7fr_1.3fr]">
+            <SoftPanel className="p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <PieChart className="h-4 w-4 text-muted" />
+                <h2 className="text-lg font-semibold text-ink">Allocation overview</h2>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <PieBlock title="Target" data={targetPie} emptyText="Add target percentages to shape the portfolio." />
+                <PieBlock title="Actual today" data={actualPie} emptyText="Log time during the day to see the real allocation." />
+              </div>
+            </SoftPanel>
+
+            <SoftPanel className="p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-ink">Active blocks</h2>
+                <span className="text-sm text-muted">{data.rows.length}</span>
+              </div>
+              {data.rows.length === 0 ? (
+                <EmptyState text="No active blocks yet. Add only the time buckets you actually want to manage." />
+              ) : (
+                <div className="space-y-2">
+                  {data.rows.map((row: TimeAllocationRow) => (
+                    <div
+                      key={row.id}
+                      className="rounded-[20px] bg-panel2/50 px-4 py-3 text-left ring-1 ring-line/70 transition hover:bg-panel2"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <button type="button" onClick={() => openEdit(row)} className="min-w-0 flex-1 text-left">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} />
+                            <p className="truncate text-base font-semibold text-ink">{row.name}</p>
+                          </div>
+                          {row.objective ? <p className="mt-1 line-clamp-2 text-sm text-muted">{row.objective}</p> : null}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Pill>{row.targetWeight}% target</Pill>
+                            <Pill>{formatDuration(row.plannedMinutes)} planned</Pill>
+                            <Pill className={row.plannedMinutesManual ? "bg-panel text-ink ring-line" : ""}>
+                              {row.plannedMinutesManual ? "manual" : `${formatDuration(row.autoPlannedMinutes)} auto`}
+                            </Pill>
+                            <Pill>{formatDuration(row.actualMinutes)} real</Pill>
+                          </div>
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted">{row.actualWeight}% actual</span>
+                          <GhostButton type="button" onClick={() => openEdit(row)} className="min-h-9 rounded-2xl bg-panel2/50 px-3 ring-1 ring-line">
+                            <PencilLine className="h-4 w-4" />
+                            Edit
+                          </GhostButton>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SoftPanel>
+          </div>
+        </>
+      )}
 
       <Drawer
         open={drawer != null}
@@ -347,13 +366,13 @@ export function TimeAllocationClient({ initialData }: { initialData: TimeAllocat
             <SoftPanel className="p-4">
               <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
                 <div>
-                  <p className="text-sm font-medium text-slate-200">Auto plan from available time</p>
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="text-sm font-medium text-ink">Auto plan from available time</p>
+                  <p className="mt-1 text-sm text-muted">
                     With a day budget of {formatDuration(data.dayBudgetMinutes)}, {drawer.draft.targetWeight}% maps to{" "}
-                    <span className="font-semibold text-slate-100">{formatDuration(draftAutoPlannedMinutes)}</span>.
+                    <span className="font-semibold text-ink">{formatDuration(draftAutoPlannedMinutes)}</span>.
                   </p>
                 </div>
-                <label className="flex items-center gap-2 rounded-2xl bg-white/[0.03] px-3 py-2 text-sm text-slate-300 ring-1 ring-white/8">
+                <label className="flex items-center gap-2 rounded-2xl bg-panel2/50 px-3 py-2 text-sm text-muted ring-1 ring-line">
                   <input
                     type="checkbox"
                     checked={drawer.draft.plannedMinutesManual}
@@ -408,10 +427,10 @@ function PieBlock({
   emptyText: string;
 }) {
   return (
-    <div className="rounded-[22px] bg-white/[0.03] p-4 ring-1 ring-white/6">
-      <h3 className="text-sm font-medium text-slate-300">{title}</h3>
+    <div className="rounded-[22px] bg-panel2/50 p-4 ring-1 ring-line/70">
+      <h3 className="text-sm font-medium text-muted">{title}</h3>
       {data.length === 0 ? (
-        <div className="grid h-56 place-items-center text-center text-sm text-slate-500">{emptyText}</div>
+        <div className="grid h-56 place-items-center text-center text-sm text-muted">{emptyText}</div>
       ) : (
         <>
           <div className="h-56">
@@ -432,11 +451,11 @@ function PieBlock({
           <div className="space-y-2">
             {data.map((entry) => (
               <div key={entry.name} className="flex items-center justify-between gap-2 text-sm">
-                <span className="flex min-w-0 items-center gap-2 text-slate-300">
+                <span className="flex min-w-0 items-center gap-2 text-muted">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
                   <span className="truncate">{entry.name}</span>
                 </span>
-                <span className="font-medium text-slate-100">{entry.value}%</span>
+                <span className="font-medium text-ink">{entry.value}%</span>
               </div>
             ))}
           </div>
@@ -447,7 +466,7 @@ function PieBlock({
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-[22px] bg-white/[0.03] px-4 py-12 text-center text-sm text-slate-500 ring-1 ring-white/6">{text}</div>;
+  return <div className="rounded-[22px] bg-panel2/50 px-4 py-12 text-center text-sm text-muted ring-1 ring-line/70">{text}</div>;
 }
 
 function readApiErrorMessage(error: unknown, fallback: string): string {

@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 
 from sqlalchemy import Boolean, Date, DateTime, Float, Integer, String, Text
-from sqlalchemy.dialects.postgresql import ENUM, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, ENUM, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -70,6 +70,12 @@ class DailyLog(Base):
     avoidedImportantTask: Mapped[bool | None] = mapped_column(Boolean)
     mainBlocker: Mapped[str | None] = mapped_column(Text)
     improvementTomorrow: Mapped[str | None] = mapped_column(Text)
+    wins: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    topImprovements: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    blockers: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    tomorrowPriorities: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    tags: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    customFields: Mapped[dict | None] = mapped_column(JSONB)
     sleepIntentClickedAt: Mapped[datetime | None] = mapped_column(DateTime)
     estimatedSleepDelayMin: Mapped[int | None] = mapped_column(Integer)
     estimatedSleepStart: Mapped[datetime | None] = mapped_column(DateTime)
@@ -93,15 +99,75 @@ class Task(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     userId: Mapped[str] = mapped_column(String, nullable=False)
     objectiveId: Mapped[str | None] = mapped_column(String)
+    companyId: Mapped[str | None] = mapped_column(String)
     title: Mapped[str] = mapped_column(Text, nullable=False)
-    date: Mapped[date] = mapped_column(Date, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    date: Mapped[date | None] = mapped_column(Date)
+    startTime: Mapped[str | None] = mapped_column(Text)
+    endTime: Mapped[str | None] = mapped_column(Text)
     importance: Mapped[str] = mapped_column(_enum(TASK_IMPORTANCES, "TaskImportance"), nullable=False, default="MEDIUM")
     productive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     estimatedMinutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completionPercent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(_enum(TASK_STATUSES, "TaskStatus"), nullable=False, default="PLANNED")
+    sortOrder: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
     updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class Company(Base):
+    __tablename__ = "Company"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    userId: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    color: Mapped[str] = mapped_column(Text, nullable=False, default="#8da2fb")
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class Tag(Base):
+    __tablename__ = "Tag"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    userId: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    color: Mapped[str] = mapped_column(Text, nullable=False, default="#57c59a")
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class TaskTag(Base):
+    __tablename__ = "TaskTag"
+
+    taskId: Mapped[str] = mapped_column(String, primary_key=True)
+    tagId: Mapped[str] = mapped_column(String, primary_key=True)
+
+
+class ThinkingNote(Base):
+    __tablename__ = "ThinkingNote"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    userId: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str | None] = mapped_column(Text)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    reminderAt: Mapped[datetime | None] = mapped_column(DateTime)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class ThinkingNoteTag(Base):
+    __tablename__ = "ThinkingNoteTag"
+
+    noteId: Mapped[str] = mapped_column(String, primary_key=True)
+    tagId: Mapped[str] = mapped_column(String, primary_key=True)
+
+
+class ThinkingNoteTask(Base):
+    __tablename__ = "ThinkingNoteTask"
+
+    noteId: Mapped[str] = mapped_column(String, primary_key=True)
+    taskId: Mapped[str] = mapped_column(String, primary_key=True)
 
 
 class TimeAllocationCategory(Base):
@@ -199,6 +265,7 @@ class CalendarEvent(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     userId: Mapped[str] = mapped_column(String, nullable=False)
+    companyId: Mapped[str | None] = mapped_column(String)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     type: Mapped[str] = mapped_column(_enum(CALENDAR_EVENT_TYPES, "CalendarEventType"), nullable=False, default="PERSONAL")
     start: Mapped[datetime] = mapped_column(DateTime, nullable=False)

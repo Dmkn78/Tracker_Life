@@ -19,6 +19,8 @@ class CalendarEventCreateRequest(ApiRequest):
     impact: CalendarImpact = CalendarImpact.MEDIUM
     expected_stress: int = Field(default=50, ge=0, le=100)
     expected_preparation_load: int = Field(default=50, ge=0, le=100)
+    company_id: str | None = None
+    company_name: str | None = None
 
     @model_validator(mode="after")
     def validate_time_range(self):
@@ -36,6 +38,8 @@ class CalendarEventUpdateRequest(ApiRequest):
     impact: CalendarImpact | None = None
     expected_stress: int | None = Field(default=None, ge=0, le=100)
     expected_preparation_load: int | None = Field(default=None, ge=0, le=100)
+    company_id: str | None = None
+    company_name: str | None = None
 
     @model_validator(mode="after")
     def validate_time_range(self):

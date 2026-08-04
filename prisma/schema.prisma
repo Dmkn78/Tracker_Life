@@ -106,8 +106,87 @@ model User {
   objectives    Objective[]
   weeklyPlanBlocks WeeklyPlanBlock[]
   weeklyReports WeeklyReport[]
+  companies     Company[]
+  tags          Tag[]
+  thinkingNotes ThinkingNote[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+}
+
+model Company {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  color     String    @default("#8da2fb")
+  tasks     Task[]
+  events    CalendarEvent[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model Tag {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  color     String         @default("#57c59a")
+  tasks     TaskTag[]
+  notes     ThinkingNoteTag[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model TaskTag {
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+  @@index([tagId])
+}
+
+model ThinkingNote {
+  id         String              @id @default(cuid())
+  userId     String
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String?
+  content    String
+  reminderAt DateTime?
+  tags       ThinkingNoteTag[]
+  tasks      ThinkingNoteTask[]
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, reminderAt])
+}
+
+model ThinkingNoteTag {
+  noteId String
+  note   ThinkingNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@index([tagId])
+}
+
+model ThinkingNoteTask {
+  noteId String
+  note   ThinkingNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, taskId])
+  @@index([taskId])
 }
 
 model DailyLog {
@@ -130,6 +209,12 @@ model DailyLog {
   avoidedImportantTask   Boolean?
   mainBlocker            String?
   improvementTomorrow    String?
+  wins                   String[]       @default([])
+  topImprovements        String[]       @default([])
+  blockers               String[]       @default([])
+  tomorrowPriorities     String[]       @default([])
+  tags                   String[]       @default([])
+  customFields           Json?
   sleepIntentClickedAt   DateTime?
   estimatedSleepDelayMin Int?
   estimatedSleepStart    DateTime?
@@ -156,18 +241,28 @@ model Task {
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   objectiveId       String?
   objective         Objective?     @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+  companyId         String?
+  company           Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
   title             String
-  date              DateTime       @db.Date
+  description       String?
+  date              DateTime?      @db.Date
+  startTime         String?
+  endTime           String?
   importance        TaskImportance @default(MEDIUM)
   productive        Boolean        @default(true)
   estimatedMinutes  Int            @default(0)
   completionPercent Int            @default(0)
   status            TaskStatus     @default(PLANNED)
+  sortOrder         Int            @default(0)
+  tags              TaskTag[]
+  thinkingNotes     ThinkingNoteTask[]
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
   @@index([userId, date])
   @@index([userId, objectiveId])
+  @@index([userId, companyId])
+  @@index([userId, sortOrder])
 }
 
 model TimeAllocationCategory {
@@ -279,6 +374,8 @@ model CalendarEvent {
   id                      String            @id @default(cuid())
   userId                  String
   user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId               String?
+  company                 Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
   title                   String
   type                    CalendarEventType @default(PERSONAL)
   start                   DateTime
@@ -290,6 +387,7 @@ model CalendarEvent {
   updatedAt               DateTime          @updatedAt
 
   @@index([userId, start])
+  @@index([userId, companyId])
 }
 
 model WeeklyReport {
