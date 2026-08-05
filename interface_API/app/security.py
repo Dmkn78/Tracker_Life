@@ -84,7 +84,7 @@ def set_session_cookie(response: Response, user_id: str) -> None:
         token,
         httponly=True,
         samesite="lax",
-        secure=get_settings().is_production,
+        secure=get_settings().cookie_secure,
         path="/",
         max_age=SESSION_DAYS * 24 * 60 * 60,
     )

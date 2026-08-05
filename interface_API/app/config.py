@@ -73,6 +73,18 @@ class Settings:
     def is_using_dev_access_key(self) -> bool:
         return not self.app_access_key
 
+    @property
+    def cookie_secure(self) -> bool:
+        """Defaults to `is_production`. Set COOKIE_SECURE=false when serving
+        production over plain HTTP (no domain/TLS yet) so the session cookie
+        set here matches the one Next.js issues (lib/auth.ts)."""
+        override = os.environ.get("COOKIE_SECURE", "").lower()
+        if override == "false":
+            return False
+        if override == "true":
+            return True
+        return self.is_production
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

@@ -20,6 +20,17 @@ function signingSecret() {
   return "dev-only-life-regime-secret";
 }
 
+/**
+ * Defaults to NODE_ENV === "production" like before. Set COOKIE_SECURE=false
+ * when serving production over plain HTTP (no domain/TLS yet) — browsers
+ * silently drop Secure cookies on non-HTTPS origins, which breaks login.
+ */
+function isSecureCookieEnabled() {
+  if (process.env.COOKIE_SECURE === "false") return false;
+  if (process.env.COOKIE_SECURE === "true") return true;
+  return process.env.NODE_ENV === "production";
+}
+
 function accessKey() {
   if (process.env.APP_ACCESS_KEY) return process.env.APP_ACCESS_KEY;
   if (process.env.NODE_ENV === "production") {
@@ -67,7 +78,7 @@ export async function createSessionCookie(userId: string) {
   jar.set(COOKIE_NAME, encode({ userId, exp }), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookieEnabled(),
     path: "/",
     expires: new Date(exp)
   });
