@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p .claude/skills/coding-rules)",
+      "Bash(mkdir -p .claude/skills/code-quality)",
+      "Bash(ls -la \"H:/CYTECHDATA/Documents/Book_swap/cours_quarto\" 2>&1 | head -50)",
+      "Bash(ls -la \"H:/CYTECHDATA/Documents/Book_swap/cours_quarto_site\" 2>&1 | head -50)",
+      "Bash(quarto --version)",
+      "Bash(python -m http.server 8934)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8934/index.html)",
+      "Bash(netstat -ano)",
+      "Bash(python -c ' *)",
+      "Bash(quarto render *)",
+      "Bash(taskkill //F //PID 21560)",
+      "Bash(tasklist)",
+      "Bash(curl -s http://localhost:8934/assets/js/schemas.js -o /tmp/served_schemas.js)",
+      "Read(//tmp/**)",
+      "Bash(taskkill //F //PID 8412)",
+      "Bash(python \"C:\\\\Users\\\\cytech\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\H--CYTECHDATA-Documents-interface\\\\73c68da2-d759-4f14-bb44-d59c5e128c34\\\\scratchpad\\\\compute_exercises.py\")",
+      "Bash(grep -o '\\\\$[^$]\\\\{0,60\\\\}€[^$]\\\\{0,10\\\\}\\\\$' index.html)",
+      "Read(//h/CYTECHDATA/Documents/assets/includes/**)",
+      "Bash(grep -rn '\\\\$[^$<>]*€[^$<>]*\\\\$' index.html partie3/pricing.html)",
+      "Bash(python \"C:\\\\Users\\\\cytech\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\H--CYTECHDATA-Documents-interface\\\\73c68da2-d759-4f14-bb44-d59c5e128c34\\\\scratchpad\\\\find_euro_in_math.py\")",
+      "Bash(python \"C:\\\\Users\\\\cytech\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\H--CYTECHDATA-Documents-interface\\\\73c68da2-d759-4f14-bb44-d59c5e128c34\\\\scratchpad\\\\find_euro_in_math2.py\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8934/exercices/index.html)"
+    ]
+  }
+}

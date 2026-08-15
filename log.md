@@ -135,3 +135,16 @@
 - `prisma validate`, `prisma generate`, compilation Python et `git diff --check` réussis ; seuls les avertissements CRLF et `MODULE_TYPELESS_PACKAGE_JSON` non bloquants restent présents.
 - Smoke test borné du serveur compilé réussi : `/login` répond `200` et `/emotional` répond `307` vers l'authentification ; le processus de test a ensuite été arrêté.
 - Vérification de la contrainte de fichiers : aucun fichier suivi supprimé.
+
+## 2026-08-15 — Audit et préparation CI/CD Windows/IIS
+
+- Plateforme identifiée : GitHub Actions, avec dépôt distant `https://github.com/Dmkn78/Tracker_Life.git`.
+- L'ancien workflow déployait par SSH vers une machine Linux et appelait `scripts/deploy.sh`; il ne correspondait pas à une VM Windows/IIS.
+- Architecture retenue pour la cible statique : build/test sur runner GitHub hébergé, artifact `out/`, puis déploiement sur un runner self-hosted Windows installé directement sur la VM IIS.
+- Ajout de `.github/workflows/deploy.yml` : déclenchement uniquement sur `push` vers `main`, `pnpm install --frozen-lockfile`, Node 22, génération Prisma, tests, build, validation stricte de `out/index.html`, artifact versionné et job IIS ciblant les labels `self-hosted/windows/x64/iis-interface`.
+- Ajout de `scripts/deploy-iis.ps1` : lecture de la Physical Path avec `Get-Website`, copie vers `releases/<commit SHA>`, bascule IIS sans vider la production, health-check HTTP, validation de `deployment.json` et rollback automatique en cas d'échec.
+- Ajout de `docs/ci-cd-windows-iis.md` : prérequis VM, variables GitHub, permissions minimales, premier déploiement, rollback et commandes de vérification.
+- Vérification critique : l'activation expérimentale de `output: "export"` échoue actuellement pendant la collecte de `/api/calendar-events`; `next.config.ts` a été restauré sans cette option. Le workflow reste donc fail-closed jusqu'à la migration des fonctionnalités serveur vers une architecture exportable.
+- Contrôles effectués : parsing PowerShell de `scripts/deploy-iis.ps1` réussi, syntaxe YAML validée par PyYAML, typecheck réussi, tests de domaine 37/37 réussis, build Next serveur réussi, aucun fichier suivi supprimé.
+- Contrôle local non concluant : les tests API échouent dans l'interpréteur Python local car `sqlalchemy` et `python-dotenv` ne sont pas installés ; le workflow installe `interface_API/requirements.txt` avant ces tests.
+- Non vérifié : exécution réelle GitHub Actions, installation du runner Windows, configuration IIS/Physical Path et déploiement réseau, car ils dépendent de la VM et de l'environnement GitHub.

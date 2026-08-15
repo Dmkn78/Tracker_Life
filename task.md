@@ -1,6 +1,6 @@
 # Plan de travail approuvé
 
-Dernière mise à jour : 2026-08-12
+Dernière mise à jour : 2026-08-15
 
 Légende : `[ ]` à faire, `[-]` en cours, `[x]` terminé, `[!]` bloqué ou partiellement vérifié.
 
@@ -75,3 +75,13 @@ Légende : `[ ]` à faire, `[-]` en cours, `[x]` terminé, `[!]` bloqué ou part
 - [x] Implémentation revue avec `coding-rules` et `code-quality`.
 - [x] Tests, typecheck et build exécutés lorsque disponibles.
 - [x] Vérification finale de toutes les tâches.
+
+## CI/CD Windows / IIS
+
+- [x] Identifier GitHub Actions comme plateforme CI/CD du dépôt.
+- [x] Choisir un runner self-hosted Windows installé sur la VM IIS pour le déploiement local et sécurisé.
+- [x] Ajouter le workflow déclenché uniquement par un push sur `main`.
+- [x] Ajouter la validation `npm/pnpm build` et du dossier `out/` avant tout déploiement.
+- [x] Ajouter le déploiement versionné IIS avec health-check et rollback automatique.
+- [x] Documenter les prérequis VM, variables GitHub, permissions, premier déploiement, rollback et vérification.
+- [!] Migrer l'application actuelle (cookies, Prisma, routes API et rendu serveur Next) vers une architecture réellement exportable avant activation effective du déploiement statique.

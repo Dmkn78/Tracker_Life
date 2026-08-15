@@ -9,6 +9,10 @@ Le projet est organisé en quatre processus ou services :
 - le service local Whisper sur le port `8001` ;
 - PostgreSQL sur le port `5432`.
 
+## CI/CD Windows / IIS
+
+Le pipeline GitHub Actions destiné à une VM Windows/IIS et son runbook sont décrits dans [`docs/ci-cd-windows-iis.md`](docs/ci-cd-windows-iis.md). La cible IIS statique exige que l'interface soit d'abord migrée vers un export Next.js réellement compatible avec `out/`; le code actuel utilise encore le rendu serveur, les cookies, Prisma et des routes API.
+
 FastAPI est la source unique de logique métier. Next.js rend l’interface, gère le cookie de session du navigateur et expose des proxies same-origin très minces. Prisma possède le schéma et les migrations PostgreSQL ; SQLAlchemy permet à FastAPI d’utiliser ce même schéma.
 
 ## Par où commencer ?
