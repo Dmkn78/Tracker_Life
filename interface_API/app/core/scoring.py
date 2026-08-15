@@ -181,5 +181,6 @@ def serialize_daily_log(log: DailyLog | None) -> dict | None:
         "regime": log.regime,
         "regimeConfidence": log.regimeConfidence,
         "submittedAt": iso_datetime(log.submittedAt),
+        "createdAt": iso_datetime(log.createdAt),
         "updatedAt": iso_datetime(log.updatedAt),
     }

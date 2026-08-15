@@ -18,7 +18,7 @@ from .ids import new_id
 
 DAILY_LOG_STATUSES = ("EMPTY", "DRAFT", "SUBMITTED", "ANALYZED", "MISSING", "SKIPPED")
 TASK_IMPORTANCES = ("LOW", "MEDIUM", "HIGH")
-TASK_STATUSES = ("PLANNED", "IN_PROGRESS", "DONE", "POSTPONED", "CANCELLED")
+TASK_STATUSES = ("PLANNED", "IN_PROGRESS", "DONE", "NOT_DONE", "POSTPONED", "CANCELLED")
 CALENDAR_EVENT_TYPES = (
     "EXAM", "INTERVIEW", "DEADLINE", "ADMIN", "SOCIAL", "TRAINING", "RECOVERY", "TRAVEL", "PERSONAL",
 )
@@ -93,6 +93,26 @@ class DailyLog(Base):
     submittedAt: Mapped[datetime | None] = mapped_column(DateTime)
 
 
+class EmotionalReview(Base):
+    __tablename__ = "EmotionalReview"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    userId: Mapped[str] = mapped_column(String, nullable=False)
+    weekId: Mapped[str] = mapped_column(String, nullable=False)
+    weekStart: Mapped[date] = mapped_column(Date, nullable=False)
+    emotions: Mapped[list[dict]] = mapped_column(JSONB, nullable=False, default=list)
+    factors: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    stressLevel: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    triggers: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    mentalSignals: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    physicalSignals: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    whatHelped: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    nextWeekAction: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
 class Task(Base):
     __tablename__ = "Task"
 
@@ -110,6 +130,7 @@ class Task(Base):
     estimatedMinutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completionPercent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(_enum(TASK_STATUSES, "TaskStatus"), nullable=False, default="PLANNED")
+    notDoneReason: Mapped[str | None] = mapped_column(Text)
     sortOrder: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
     updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
@@ -213,6 +234,33 @@ class DailyPlanningContext(Base):
     updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
 
 
+class TimeAllocationPeriodContext(Base):
+    __tablename__ = "TimeAllocationPeriodContext"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    userId: Mapped[str] = mapped_column(String, nullable=False)
+    period: Mapped[str] = mapped_column(_enum(("WEEK", "MONTH"), "TimeAllocationPeriod"), nullable=False)
+    startDate: Mapped[date] = mapped_column(Date, nullable=False)
+    budgetMinutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class PeriodicTimeAllocation(Base):
+    __tablename__ = "PeriodicTimeAllocation"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    userId: Mapped[str] = mapped_column(String, nullable=False)
+    categoryId: Mapped[str] = mapped_column(String, nullable=False)
+    period: Mapped[str] = mapped_column(_enum(("WEEK", "MONTH"), "TimeAllocationPeriod"), nullable=False)
+    startDate: Mapped[date] = mapped_column(Date, nullable=False)
+    plannedMinutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    plannedMinutesManual: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    note: Mapped[str | None] = mapped_column(Text)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
 class Habit(Base):
     __tablename__ = "Habit"
 
@@ -223,9 +271,27 @@ class Habit(Base):
     description: Mapped[str | None] = mapped_column(Text)
     targetTime: Mapped[str | None] = mapped_column(Text)
     defaultExpectedMinutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    recurrenceDays: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=False, default=lambda: [1, 2, 3, 4, 5, 6, 7])
+    timeBlockEnabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sortOrder: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     source: Mapped[str] = mapped_column(Text, nullable=False, default="manual")
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class HabitTemplate(Base):
+    __tablename__ = "HabitTemplate"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    userId: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False, default="routine")
+    description: Mapped[str | None] = mapped_column(Text)
+    targetTime: Mapped[str | None] = mapped_column(Text)
+    defaultExpectedMinutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    recurrenceDays: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=False, default=lambda: [1, 2, 3, 4, 5, 6, 7])
+    timeBlockEnabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
     updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
 
@@ -251,6 +317,7 @@ class RoutineBlock(Base):
     userId: Mapped[str] = mapped_column(String, nullable=False)
     habitId: Mapped[str | None] = mapped_column(String)
     dayType: Mapped[str] = mapped_column(Text, nullable=False, default="school_day")
+    recurrenceDays: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=False, default=lambda: [1, 2, 3, 4, 5, 6, 7])
     label: Mapped[str] = mapped_column(Text, nullable=False)
     startTime: Mapped[str] = mapped_column(Text, nullable=False)
     endTime: Mapped[str] = mapped_column(Text, nullable=False)

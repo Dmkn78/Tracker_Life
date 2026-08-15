@@ -1,10 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import { IconButton, Panel, PrimaryButton, TextInput } from "@/components/ui";
 import type { DayLogStatus } from "@/features/daily-log/domain/dailyLog";
+import { useLocale } from "@/features/interface/localization/LocaleProvider";
 import { addDays, formatDisplayDate, parseDateKey, toDateKey } from "@/lib/dates";
-
-const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function dateKey(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -18,8 +19,8 @@ function addMonths(date: Date, months: number) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
 }
 
-function monthLabel(date: Date) {
-  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(date);
+function monthLabel(date: Date, locale: "en" | "fr") {
+  return new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(date);
 }
 
 function buildMonthGrid(selectedDate: string) {
@@ -45,6 +46,9 @@ export function DailyLogDatePicker({
   selectedDate: string;
   statuses: Record<string, DayLogStatus>;
 }) {
+  const { locale } = useLocale();
+  const copy = DATE_PICKER_COPY[locale];
+  const weekDays = locale === "fr" ? ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const selected = parseDateKey(selectedDate);
   const month = monthStart(selected);
   const previousMonth = dateKey(addMonths(month, -1));
@@ -60,30 +64,30 @@ export function DailyLogDatePicker({
             <CalendarDays className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-accent">Daily Log Calendar</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-accent">{copy.calendar}</p>
             <h2 className="text-xl font-semibold text-ink">{formatDisplayDate(selectedDate)}</h2>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link href={`/daily-log?date=${previousMonth}`}>
-            <IconButton type="button">Previous month</IconButton>
+            <IconButton type="button">{copy.previous}</IconButton>
           </Link>
           <Link href={`/daily-log?date=${today}`}>
-            <PrimaryButton type="button">Today</PrimaryButton>
+            <PrimaryButton type="button">{copy.today}</PrimaryButton>
           </Link>
           <Link href={`/daily-log?date=${nextMonth}`}>
-            <IconButton type="button">Next month</IconButton>
+            <IconButton type="button">{copy.next}</IconButton>
           </Link>
           <form action="/daily-log" className="flex items-center gap-2">
             <TextInput type="date" name="date" defaultValue={selectedDate} className="w-auto" />
-            <IconButton type="submit">Open</IconButton>
+            <IconButton type="submit">{copy.open}</IconButton>
           </form>
         </div>
       </div>
 
       <div className="mt-4 rounded-md border border-line bg-shell p-3">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-ink">{monthLabel(month)}</h3>
+          <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-ink">{monthLabel(month, locale)}</h3>
           <div className="flex flex-wrap gap-2 font-mono text-[11px] uppercase">
             <span className="text-good">submitted</span>
             <span className="text-accent">draft</span>
@@ -113,7 +117,7 @@ export function DailyLogDatePicker({
                   <span className="font-mono text-sm font-semibold">{date.getUTCDate()}</span>
                   {day === today ? <span className="h-2 w-2 rounded-full bg-accent" /> : null}
                 </div>
-                <p className="mt-3 truncate font-mono text-[10px] uppercase">{status ?? "no log"}</p>
+                <p className="mt-3 truncate font-mono text-[10px] uppercase">{status ?? copy.noLog}</p>
               </Link>
             );
           })}
@@ -122,3 +126,8 @@ export function DailyLogDatePicker({
     </Panel>
   );
 }
+
+const DATE_PICKER_COPY = {
+  en: { calendar: "Daily Log Calendar", previous: "Previous month", today: "Today", next: "Next month", open: "Open", noLog: "no log" },
+  fr: { calendar: "Calendrier du journal", previous: "Mois précédent", today: "Aujourd’hui", next: "Mois suivant", open: "Ouvrir", noLog: "aucun journal" }
+} as const;

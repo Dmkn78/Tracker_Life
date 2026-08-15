@@ -14,6 +14,8 @@ export type Habit = {
   description: string | null;
   targetTime: string | null;
   defaultExpectedMinutes: number;
+  recurrenceDays: number[];
+  timeBlockEnabled: boolean;
   sortOrder: number;
   source: string;
   checkin: HabitCheckin;
@@ -23,16 +25,39 @@ export type RoutineBlock = {
   id: string;
   habitId: string | null;
   dayType: string;
+  recurrenceDays: number[];
   label: string;
   startTime: string;
   endTime: string;
   sortOrder: number;
 };
 
+export type HabitTemplate = {
+  id: string;
+  name: string;
+  category: string;
+  description: string | null;
+  targetTime: string | null;
+  defaultExpectedMinutes: number;
+  recurrenceDays: number[];
+  timeBlockEnabled: boolean;
+};
+
+export type CalendarRoutinePlan = {
+  id: string;
+  blockId: string;
+  habitId: string;
+  title: string;
+  category: string;
+  start: string;
+  end: string;
+};
+
 export type HabitTrackerData = {
   date: string;
   habits: Habit[];
   routineBlocks: RoutineBlock[];
+  templates: HabitTemplate[];
   metrics: {
     completedToday: number;
     totalToday: number;
@@ -48,6 +73,8 @@ export type HabitDraft = {
   description: string;
   targetTime: string;
   defaultExpectedMinutes: number;
+  recurrenceDays: number[];
+  timeBlockEnabled: boolean;
 };
 
 export type HabitCheckinPatch = {

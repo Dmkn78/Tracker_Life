@@ -41,21 +41,37 @@ def serialize_event(db: Session, event: CalendarEvent | None) -> dict | None:
 def list_events(
     from_: str | None = Query(default=None, alias="from"),
     to: str | None = Query(default=None),
+    event_start: datetime | None = Query(default=None, alias="eventStart"),
+    event_end_exclusive: datetime | None = Query(default=None, alias="eventEndExclusive"),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    from_key = from_ or to_date_key()
-    to_key = to or add_days(from_key, 30)
-    start = datetime.combine(parse_date_key(from_key), time.min)
-    end = datetime.combine(parse_date_key(to_key), time.max)
+    start, end = resolve_event_range(from_, to, event_start, event_end_exclusive)
     events = list(
         db.execute(
             select(CalendarEvent)
-            .where(CalendarEvent.userId == user.id, CalendarEvent.start >= start, CalendarEvent.start < end)
+            .where(CalendarEvent.userId == user.id, CalendarEvent.end > start, CalendarEvent.start < end)
             .order_by(CalendarEvent.start.asc())
         ).scalars()
     )
     return {"events": [serialize_event(db, event) for event in events]}
+
+
+def resolve_event_range(from_, to, event_start, event_end_exclusive):
+    if (event_start is None) != (event_end_exclusive is None):
+        raise HTTPException(status_code=422, detail="eventStart and eventEndExclusive must be provided together")
+    if event_start is not None:
+        start = to_utc_naive(event_start)
+        end = to_utc_naive(event_end_exclusive)
+        if end <= start:
+            raise HTTPException(status_code=422, detail="eventEndExclusive must be after eventStart")
+        return start, end
+    from_key = from_ or to_date_key()
+    to_key = to or add_days(from_key, 30)
+    return (
+        datetime.combine(parse_date_key(from_key), time.min),
+        datetime.combine(parse_date_key(add_days(to_key, 1)), time.min),
+    )
 
 
 @router.post("")

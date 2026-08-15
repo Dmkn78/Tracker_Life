@@ -4,7 +4,7 @@ export type ObjectiveStatus = "planned" | "active" | "on_track" | "at_risk" | "p
 export type ObjectivePriority = "low" | "medium" | "high" | "critical";
 export type WeeklyPlanCategory = "work" | "study" | "sport" | "rest" | "admin" | "personal" | "social" | "travel";
 export type ObjectiveTaskImportance = "low" | "medium" | "high";
-export type ObjectiveTaskStatus = "planned" | "in_progress" | "done" | "postponed" | "cancelled";
+export type ObjectiveTaskStatus = "planned" | "in_progress" | "done" | "not_done" | "postponed" | "cancelled";
 export type ObjectiveCalendarEventType = "exam" | "interview" | "deadline" | "admin" | "social" | "training" | "recovery" | "travel" | "personal";
 export type ObjectiveCalendarImpact = "low" | "medium" | "high" | "critical";
 

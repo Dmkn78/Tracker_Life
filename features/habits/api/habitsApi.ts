@@ -1,4 +1,5 @@
 import {
+  expectBoolean,
   expectNullableString,
   expectJsonObject,
   expectNumber,
@@ -8,7 +9,9 @@ import {
 } from "@/lib/http/apiClient";
 import {
   type Habit,
+  type CalendarRoutinePlan,
   type HabitDraft,
+  type HabitTemplate,
   type HabitTrackerData,
   type RoutineBlock
 } from "../domain/habit";
@@ -41,12 +44,30 @@ export function saveHabitCheckin(
   });
 }
 
-export function createHabit(input: HabitDraft): Promise<string> {
+export function createHabit(input: HabitDraft, saveAsTemplate = false): Promise<string> {
   return requestJson("/api/habits", parseHabitMutationResponse, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input)
+    body: JSON.stringify({ ...input, saveAsTemplate })
   });
+}
+
+export async function deleteHabitTemplate(id: string): Promise<void> {
+  const query = new URLSearchParams({ id, kind: "template" });
+  await requestJson(`/api/habits?${query.toString()}`, (payload) => {
+    const response = expectJsonObject(payload, "delete habit template response");
+    if (response.ok !== true) throw new Error("delete habit template response.ok must be true");
+    return true;
+  }, { method: "DELETE" });
+}
+
+export function loadCalendarRoutinePlans(
+  from: string,
+  to: string,
+  signal?: AbortSignal
+): Promise<CalendarRoutinePlan[]> {
+  const query = new URLSearchParams({ kind: "calendar", from, to });
+  return requestJson(`/api/habits?${query.toString()}`, parseCalendarRoutinePlans, { signal });
 }
 
 export function updateHabit(input: HabitDraft & { id: string }): Promise<string> {
@@ -75,6 +96,7 @@ export function parseHabitTrackerData(payload: unknown): HabitTrackerData {
       "habit tracker response.routineBlocks",
       parseRoutineBlock
     ),
+    templates: parseJsonArray(tracker.templates, "habit tracker response.templates", parseHabitTemplate),
     metrics: {
       completedToday: expectNumber(metrics.completedToday, "habit tracker response.metrics.completedToday"),
       totalToday: expectNumber(metrics.totalToday, "habit tracker response.metrics.totalToday"),
@@ -109,6 +131,8 @@ function parseHabit(payload: unknown, context: string): Habit {
       habit.defaultExpectedMinutes,
       `${context}.defaultExpectedMinutes`
     ),
+    recurrenceDays: parseNumberArray(habit.recurrenceDays, `${context}.recurrenceDays`),
+    timeBlockEnabled: expectBoolean(habit.timeBlockEnabled, `${context}.timeBlockEnabled`),
     sortOrder: expectNumber(habit.sortOrder, `${context}.sortOrder`),
     source: expectString(habit.source, `${context}.source`),
     checkin: {
@@ -126,9 +150,44 @@ function parseRoutineBlock(payload: unknown, context: string): RoutineBlock {
     id: expectString(block.id, `${context}.id`),
     habitId: expectNullableString(block.habitId, `${context}.habitId`),
     dayType: expectString(block.dayType, `${context}.dayType`),
+    recurrenceDays: parseNumberArray(block.recurrenceDays, `${context}.recurrenceDays`),
     label: expectString(block.label, `${context}.label`),
     startTime: expectString(block.startTime, `${context}.startTime`),
     endTime: expectString(block.endTime, `${context}.endTime`),
     sortOrder: expectNumber(block.sortOrder, `${context}.sortOrder`)
   };
+}
+
+function parseHabitTemplate(payload: unknown, context: string): HabitTemplate {
+  const template = expectJsonObject(payload, context);
+  return {
+    id: expectString(template.id, `${context}.id`),
+    name: expectString(template.name, `${context}.name`),
+    category: expectString(template.category, `${context}.category`),
+    description: expectNullableString(template.description, `${context}.description`),
+    targetTime: expectNullableString(template.targetTime, `${context}.targetTime`),
+    defaultExpectedMinutes: expectNumber(template.defaultExpectedMinutes, `${context}.defaultExpectedMinutes`),
+    recurrenceDays: parseNumberArray(template.recurrenceDays, `${context}.recurrenceDays`),
+    timeBlockEnabled: expectBoolean(template.timeBlockEnabled, `${context}.timeBlockEnabled`)
+  };
+}
+
+function parseCalendarRoutinePlans(payload: unknown): CalendarRoutinePlan[] {
+  const response = expectJsonObject(payload, "calendar routine response");
+  return parseJsonArray(response.routines, "calendar routine response.routines", (value, context) => {
+    const routine = expectJsonObject(value, context);
+    return {
+      id: expectString(routine.id, `${context}.id`),
+      blockId: expectString(routine.blockId, `${context}.blockId`),
+      habitId: expectString(routine.habitId, `${context}.habitId`),
+      title: expectString(routine.title, `${context}.title`),
+      category: expectString(routine.category, `${context}.category`),
+      start: expectString(routine.start, `${context}.start`),
+      end: expectString(routine.end, `${context}.end`)
+    };
+  });
+}
+
+function parseNumberArray(payload: unknown, context: string): number[] {
+  return parseJsonArray(payload, context, (value, itemContext) => expectNumber(value, itemContext));
 }

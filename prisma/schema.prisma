@@ -26,6 +26,7 @@ enum TaskStatus {
   PLANNED
   IN_PROGRESS
   DONE
+  NOT_DONE
   POSTPONED
   CANCELLED
 }
@@ -89,6 +90,11 @@ enum WeeklyPlanCategory {
   TRAVEL
 }
 
+enum TimeAllocationPeriod {
+  WEEK
+  MONTH
+}
+
 model User {
   id            String          @id @default(cuid())
   label         String          @default("Local user")
@@ -100,7 +106,10 @@ model User {
   timeCategories TimeAllocationCategory[]
   timeAllocations DailyTimeAllocation[]
   planningContexts DailyPlanningContext[]
+  periodicTimeAllocations PeriodicTimeAllocation[]
+  periodPlanningContexts TimeAllocationPeriodContext[]
   habits       Habit[]
+  habitTemplates HabitTemplate[]
   habitCheckins HabitCheckin[]
   routineBlocks RoutineBlock[]
   objectives    Objective[]
@@ -109,8 +118,31 @@ model User {
   companies     Company[]
   tags          Tag[]
   thinkingNotes ThinkingNote[]
+  emotionalReviews EmotionalReview[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+}
+
+model EmotionalReview {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekId          String
+  weekStart       DateTime @db.Date
+  emotions        Json
+  factors         String[] @default([])
+  stressLevel     Int      @default(0)
+  triggers        String[] @default([])
+  mentalSignals   String[] @default([])
+  physicalSignals String[] @default([])
+  whatHelped      String[] @default([])
+  nextWeekAction  String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, weekId])
+  @@index([userId, weekStart])
 }
 
 model Company {
@@ -253,6 +285,7 @@ model Task {
   estimatedMinutes  Int            @default(0)
   completionPercent Int            @default(0)
   status            TaskStatus     @default(PLANNED)
+  notDoneReason     String?
   sortOrder         Int            @default(0)
   tags              TaskTag[]
   thinkingNotes     ThinkingNoteTask[]
@@ -278,10 +311,43 @@ model TimeAllocationCategory {
   color          String                @default("#22d3ee")
   active         Boolean               @default(true)
   allocations    DailyTimeAllocation[]
+  periodicAllocations PeriodicTimeAllocation[]
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
   @@index([userId, active])
+}
+
+model TimeAllocationPeriodContext {
+  id            String               @id @default(cuid())
+  userId        String
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  period        TimeAllocationPeriod
+  startDate     DateTime             @db.Date
+  budgetMinutes Int
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@unique([userId, period, startDate])
+  @@index([userId, startDate])
+}
+
+model PeriodicTimeAllocation {
+  id                   String                 @id @default(cuid())
+  userId               String
+  user                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId           String
+  category             TimeAllocationCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  period               TimeAllocationPeriod
+  startDate            DateTime               @db.Date
+  plannedMinutes       Int                    @default(0)
+  plannedMinutesManual Boolean                @default(false)
+  note                 String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  @@unique([userId, categoryId, period, startDate])
+  @@index([userId, period, startDate])
 }
 
 model DailyTimeAllocation {
@@ -324,6 +390,8 @@ model Habit {
   description            String?
   targetTime             String?
   defaultExpectedMinutes Int            @default(0)
+  recurrenceDays         Int[]          @default([1, 2, 3, 4, 5, 6, 7])
+  timeBlockEnabled       Boolean        @default(false)
   sortOrder              Int            @default(0)
   active                 Boolean        @default(true)
   source                 String         @default("manual")
@@ -333,6 +401,23 @@ model Habit {
   updatedAt              DateTime       @updatedAt
 
   @@index([userId, active])
+}
+
+model HabitTemplate {
+  id                     String   @id @default(cuid())
+  userId                 String
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                   String
+  category               String   @default("routine")
+  description            String?
+  targetTime             String?
+  defaultExpectedMinutes Int      @default(0)
+  recurrenceDays         Int[]    @default([1, 2, 3, 4, 5, 6, 7])
+  timeBlockEnabled       Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([userId, createdAt])
 }
 
 model HabitCheckin {
@@ -359,6 +444,7 @@ model RoutineBlock {
   habitId   String?
   habit     Habit?   @relation(fields: [habitId], references: [id], onDelete: SetNull)
   dayType   String   @default("school_day")
+  recurrenceDays Int[] @default([1, 2, 3, 4, 5, 6, 7])
   label     String
   startTime String
   endTime   String

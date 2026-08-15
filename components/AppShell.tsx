@@ -11,60 +11,39 @@ import {
   Clock3,
   FolderKanban,
   Home,
+  HeartPulse,
   Lightbulb,
   Menu,
   MonitorCog,
-  Moon,
   PieChart,
   Repeat2,
   Settings,
   SlidersHorizontal,
-  Sun,
   X
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { AppearanceControl } from "@/features/interface/components/AppearanceControl";
+import { LocaleControl } from "@/features/interface/components/LocaleControl";
+import { useLocale } from "@/features/interface/localization/LocaleProvider";
+import type { TranslationKey } from "@/features/interface/localization/messages";
 
-const nav = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/life-terminal", label: "Terminal", icon: MonitorCog },
-  { href: "/life", label: "Life", icon: Activity },
-  { href: "/daily-log", label: "Daily Log", icon: SlidersHorizontal },
-  { href: "/todo", label: "To-do", icon: CheckSquare },
-  { href: "/thinking", label: "Thinking", icon: Lightbulb },
-  { href: "/objectives", label: "Objectives", icon: FolderKanban },
-  { href: "/time-allocation", label: "Time Allocation", icon: PieChart },
-  { href: "/habits", label: "Habits", icon: Repeat2 },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/history", label: "History", icon: Clock3 },
-  { href: "/settings", label: "Settings", icon: Settings }
-];
+const NAVIGATION_ITEMS = [
+  { href: "/", labelKey: "nav.home", icon: Home },
+  { href: "/life-terminal", labelKey: "nav.terminal", icon: MonitorCog },
+  { href: "/life", labelKey: "nav.life", icon: Activity },
+  { href: "/daily-log", labelKey: "nav.dailyLog", icon: SlidersHorizontal },
+  { href: "/emotional", labelKey: "nav.emotional", icon: HeartPulse },
+  { href: "/todo", labelKey: "nav.todo", icon: CheckSquare },
+  { href: "/thinking", labelKey: "nav.thinking", icon: Lightbulb },
+  { href: "/objectives", labelKey: "nav.objectives", icon: FolderKanban },
+  { href: "/time-allocation", labelKey: "nav.timeAllocation", icon: PieChart },
+  { href: "/habits", labelKey: "nav.habits", icon: Repeat2 },
+  { href: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
+  { href: "/history", labelKey: "nav.history", icon: Clock3 },
+  { href: "/settings", labelKey: "nav.settings", icon: Settings }
+] satisfies Array<{ href: string; labelKey: TranslationKey; icon: typeof Home }>;
 
-const storageKey = "life-regime:sidebar-collapsed";
-
-function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
-
-  const isLight = mounted && theme === "light";
-
-  return (
-    <button
-      type="button"
-      onClick={() => setTheme(isLight ? "dark" : "light")}
-      className={`focus-ring flex h-11 items-center rounded-2xl bg-panel2/60 px-3 text-sm font-medium text-muted ring-1 ring-line transition hover:bg-panel2 hover:text-ink ${
-        collapsed ? "justify-center" : "gap-3"
-      }`}
-      aria-label={isLight ? "Switch to dark theme" : "Switch to light theme"}
-      title={isLight ? "Switch to dark theme" : "Switch to light theme"}
-    >
-      {isLight ? <Moon className="h-5 w-5 shrink-0" /> : <Sun className="h-5 w-5 shrink-0" />}
-      {!collapsed ? <span className="truncate">{isLight ? "Dark theme" : "Light theme"}</span> : null}
-    </button>
-  );
-}
+const SIDEBAR_STORAGE_KEY = "life-regime:sidebar-collapsed";
 
 function NavLink({
   href,
@@ -113,31 +92,43 @@ function SidebarContent({
   onNavigate?: () => void;
   mobile?: boolean;
 }) {
+  const { translate } = useLocale();
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className={`flex items-start ${collapsed && !mobile ? "justify-center" : "justify-between"} gap-3`}>
         <Link href="/" className="block min-w-0" onClick={onNavigate}>
           <p className={`text-[11px] font-medium uppercase tracking-[0.2em] text-muted ${collapsed && !mobile ? "text-center" : ""}`}>Life Regime</p>
-          {!collapsed || mobile ? <h1 className="mt-1 truncate text-xl font-semibold tracking-normal text-ink">Tracker</h1> : null}
+          {!collapsed || mobile ? (
+            <h1 className="mt-1 truncate text-xl font-semibold tracking-normal text-ink">
+              {translate("shell.tracker")}
+            </h1>
+          ) : null}
         </Link>
         {onToggle ? (
           <button
             type="button"
             onClick={onToggle}
             className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-panel2/60 text-muted ring-1 ring-line transition hover:bg-panel2 hover:text-ink"
-            aria-label={collapsed ? "Expand sidebar" : mobile ? "Close menu" : "Collapse sidebar"}
+            aria-label={translate(
+              collapsed
+                ? "shell.expandSidebar"
+                : mobile
+                  ? "shell.closeMenu"
+                  : "shell.collapseSidebar"
+            )}
           >
             {mobile ? <X className="h-4 w-4" /> : collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
         ) : null}
       </div>
 
-      <nav className="mt-8 grid gap-2">
-        {nav.map((item) => (
+      <nav className="thin-scrollbar mt-8 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">
+        {NAVIGATION_ITEMS.map((item) => (
           <NavLink
             key={item.href}
             href={item.href}
-            label={item.label}
+            label={translate(item.labelKey)}
             icon={item.icon}
             collapsed={collapsed && !mobile}
             active={pathname === item.href}
@@ -147,10 +138,22 @@ function SidebarContent({
       </nav>
 
       <div className="mt-auto grid gap-2">
-        <ThemeToggle collapsed={collapsed && !mobile} />
+        {collapsed && !mobile ? (
+          <div className="grid gap-2">
+            <AppearanceControl compact />
+            <LocaleControl compact />
+          </div>
+        ) : (
+          <>
+            <AppearanceControl />
+            <div className="rounded-[20px] bg-panel2/70 p-3 ring-1 ring-line">
+              <LocaleControl />
+            </div>
+          </>
+        )}
         <div className={`rounded-[20px] bg-panel2/70 p-3 ring-1 ring-line ${collapsed && !mobile ? "hidden" : ""}`}>
-          <p className="text-xs font-medium uppercase text-muted">Mode</p>
-          <p className="mt-1 text-sm font-semibold text-ink">Calm operating system</p>
+          <p className="text-xs font-medium uppercase text-muted">{translate("shell.mode")}</p>
+          <p className="mt-1 text-sm font-semibold text-ink">{translate("shell.calmOperatingSystem")}</p>
         </div>
       </div>
     </div>
@@ -159,16 +162,17 @@ function SidebarContent({
 
 export function AppShell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
   const pathname = usePathname();
+  const { translate } = useLocale();
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(storageKey);
+    const stored = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
     setDesktopCollapsed(stored === "1");
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(storageKey, desktopCollapsed ? "1" : "0");
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, desktopCollapsed ? "1" : "0");
   }, [desktopCollapsed]);
 
   useEffect(() => {
@@ -193,7 +197,7 @@ export function AppShell({ children, wide = false }: { children: React.ReactNode
 
       {mobileOpen ? (
         <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden">
-          <button type="button" className="absolute inset-0" aria-label="Close menu" onClick={() => setMobileOpen(false)} />
+          <button type="button" className="absolute inset-0" aria-label={translate("shell.closeMenu")} onClick={() => setMobileOpen(false)} />
           <aside className="absolute inset-y-0 left-0 w-[86vw] max-w-[320px] bg-shell/96 px-4 py-6 shadow-[0_20px_60px_rgba(0,0,0,0.45)] ring-1 ring-line">
             <SidebarContent collapsed={false} pathname={pathname} onToggle={() => setMobileOpen(false)} onNavigate={() => setMobileOpen(false)} mobile />
           </aside>
@@ -206,11 +210,13 @@ export function AppShell({ children, wide = false }: { children: React.ReactNode
             type="button"
             onClick={() => setMobileOpen(true)}
             className="focus-ring inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-panel2/70 text-ink ring-1 ring-line transition hover:bg-panel2"
-            aria-label="Open navigation"
+            aria-label={translate("shell.openNavigation")}
           >
             <Menu className="h-5 w-5" />
           </button>
-          <p className="truncate text-sm font-medium text-muted">{nav.find((item) => item.href === pathname)?.label ?? "Life Regime"}</p>
+          <p className="truncate text-sm font-medium text-muted">
+            {translate(NAVIGATION_ITEMS.find((item) => item.href === pathname)?.labelKey ?? "nav.home")}
+          </p>
         </div>
         <div className="min-w-0">{children}</div>
       </main>

@@ -37,6 +37,7 @@ class TaskStatus(CaseInsensitiveEnum):
     PLANNED = "PLANNED"
     IN_PROGRESS = "IN_PROGRESS"
     DONE = "DONE"
+    NOT_DONE = "NOT_DONE"
     POSTPONED = "POSTPONED"
     CANCELLED = "CANCELLED"
 

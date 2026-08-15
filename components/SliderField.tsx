@@ -1,6 +1,7 @@
 "use client";
 
 import { FieldLabel } from "@/components/ui";
+import { useId } from "react";
 
 export function SliderField({
   label,
@@ -17,16 +18,18 @@ export function SliderField({
   max?: number;
   suffix?: string;
 }) {
+  const inputId = useId();
   return (
     <div>
       <div className="flex items-center justify-between gap-4">
-        <FieldLabel>{label}</FieldLabel>
+        <FieldLabel htmlFor={inputId}>{label}</FieldLabel>
         <span className="tabular-nums text-lg font-semibold text-ink">
           {value}
           {suffix}
         </span>
       </div>
       <input
+        id={inputId}
         type="range"
         min={min}
         max={max}

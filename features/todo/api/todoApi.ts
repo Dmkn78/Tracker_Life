@@ -14,7 +14,8 @@ import {
   type TodoImportance,
   type TodoScope,
   type TodoStatus,
-  type TodoTask
+  type TodoTask,
+  type TodoTaskWriteValues
 } from "../domain/todoTask";
 
 type ListTodoTasksInput = {
@@ -31,21 +32,7 @@ type ListTodoTasksRangeInput = {
 
 /** Wire shape for create/update: nullable fields (date, description, ...) can be
  * explicitly cleared with `null`, `undefined` simply omits the key. */
-export type TaskWritePayload = {
-  title?: string;
-  description?: string | null;
-  date?: string | null;
-  startTime?: string | null;
-  endTime?: string | null;
-  objectiveId?: string | null;
-  companyName?: string | null;
-  tagNames?: string[];
-  importance?: TodoImportance;
-  productive?: boolean;
-  estimatedMinutes?: number;
-  completionPercent?: number;
-  status?: TodoStatus;
-};
+export type TaskWritePayload = Partial<TodoTaskWriteValues>;
 
 type CreateTodoTaskItem = TaskWritePayload & { title: string };
 type CreateTodoTasksInput = { items: CreateTodoTaskItem[] };
@@ -165,6 +152,7 @@ function parseTodoTask(payload: unknown, context: string): TodoTask {
     estimatedMinutes: expectNumber(task.estimatedMinutes, `${context}.estimatedMinutes`),
     completionPercent: expectNumber(task.completionPercent, `${context}.completionPercent`),
     status: expectTodoStatus(task.status, `${context}.status`),
+    notDoneReason: expectOptionalNullableString(task.notDoneReason, `${context}.notDoneReason`) ?? null,
     sortOrder: expectNumber(task.sortOrder, `${context}.sortOrder`)
   };
 }

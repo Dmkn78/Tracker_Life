@@ -14,12 +14,13 @@ export function addDays(dateKey: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-export function formatDisplayDate(dateKey: string) {
-  return new Intl.DateTimeFormat("en", {
+export function formatDisplayDate(dateKey: string, locale = "en") {
+  return new Intl.DateTimeFormat(locale, {
     weekday: "long",
     month: "long",
     day: "numeric",
-    year: "numeric"
+    year: "numeric",
+    timeZone: "UTC"
   }).format(parseDateKey(dateKey));
 }
 

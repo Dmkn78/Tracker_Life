@@ -41,7 +41,7 @@ type ObjectiveMutationInput =
   | (WeeklyBlockDraft & { kind: "weekly_block"; weekId: string });
 
 const TASK_IMPORTANCE_LEVELS = ["low", "medium", "high"] as const;
-const TASK_STATUSES = ["planned", "in_progress", "done", "postponed", "cancelled"] as const;
+const TASK_STATUSES = ["planned", "in_progress", "done", "not_done", "postponed", "cancelled"] as const;
 const CALENDAR_EVENT_TYPES = [
   "exam",
   "interview",

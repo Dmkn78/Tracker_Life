@@ -75,7 +75,8 @@ function parseTags(payload: unknown, context: string): Tag[] {
     return {
       id: expectString(record.id, `${context}[${index}].id`),
       name: expectString(record.name, `${context}[${index}].name`),
-      color: expectString(record.color, `${context}[${index}].color`)
+      color: expectString(record.color, `${context}[${index}].color`),
+      usageCount: 1
     };
   });
 }

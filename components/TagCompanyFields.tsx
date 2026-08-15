@@ -1,32 +1,37 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { FieldLabel, GhostButton, Pill, TextInput } from "@/components/ui";
 import type { Company, Tag } from "@/features/shared/domain/tagCompany";
 
 export function CompanyField({
   label = "Company",
+  placeholder = "No company",
   value,
   onChange,
   companies
 }: {
   label?: string;
+  placeholder?: string;
   value: string;
   onChange: (name: string) => void;
   companies: Company[];
 }) {
+  const inputId = useId();
+  const optionsId = useId();
   return (
     <div>
-      <FieldLabel>{label}</FieldLabel>
+      <FieldLabel htmlFor={inputId}>{label}</FieldLabel>
       <TextInput
-        list="company-options"
+        id={inputId}
+        list={optionsId}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="No company"
+        placeholder={placeholder}
         className="mt-2"
       />
-      <datalist id="company-options">
+      <datalist id={optionsId}>
         {companies.map((company) => (
           <option key={company.id} value={company.name} />
         ))}
@@ -37,11 +42,15 @@ export function CompanyField({
 
 export function TagsField({
   label = "Tags",
+  placeholder = "Add a tag",
+  removeTagLabel = (name) => `Remove ${name} tag`,
   value,
   onChange,
   tags
 }: {
   label?: string;
+  placeholder?: string;
+  removeTagLabel?: (name: string) => string;
   value: string[];
   onChange: (names: string[]) => void;
   tags: Tag[];
@@ -73,7 +82,7 @@ export function TagsField({
               type="button"
               onClick={() => removeTag(name)}
               className="ml-1.5 -mr-0.5 rounded-full p-0.5 hover:bg-panel2"
-              aria-label={`Remove ${name} tag`}
+              aria-label={removeTagLabel(name)}
             >
               <X className="h-3 w-3" />
             </button>
@@ -97,7 +106,7 @@ export function TagsField({
               setDraft("");
             }
           }}
-          placeholder="Add a tag"
+          placeholder={placeholder}
           className="focus-ring h-9 min-w-[120px] flex-1 rounded-full bg-shell px-3 text-sm text-ink ring-1 ring-line placeholder:text-muted"
         />
         <datalist id="tag-options">
