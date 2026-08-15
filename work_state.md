@@ -1,13 +1,13 @@
 # État du travail
 
-Dernière mise à jour : 2026-08-12
+Dernière mise à jour : 2026-08-15
 
-- Phase actuelle : vérification finale terminée.
-- Page actuelle : toutes les pages validées sont traitées.
-- Tâches en cours : aucune.
+- Phase actuelle : audit et préparation CI/CD Windows/IIS.
+- Page actuelle : pipeline de déploiement.
+- Tâches en cours : finaliser le pipeline fail-closed et la documentation VM.
 - Tâches terminées : audit, plan, validation ; Global / Interface ; To-Do ; Planning / Calendar ; Time Allocation ; Habits / Routines ; Notes / Thinking ; Daily Log ; Emotional.
-- Blocages : migrations PostgreSQL non appliquées volontairement ; aucun accès à un sous-agent Luna Max dans cette session.
-- Prochaine action : appliquer les migrations sur la base cible puis effectuer le smoke test navigateur connecté à cette base.
+- Blocages : migrations PostgreSQL non appliquées volontairement ; aucun accès à un sous-agent Luna Max dans cette session ; l'application actuelle utilise encore des fonctions serveur Next.js et ne produit pas d'export statique `out/`, donc une migration applicative est requise avant le premier déploiement IIS statique.
+- Prochaine action : migrer l'interface vers un export statique, puis pousser `main` pour déclencher le workflow.
 
 ## Décisions validées
 
