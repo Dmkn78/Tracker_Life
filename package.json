@@ -2,14 +2,24 @@
   "name": "life-regime-tracker",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.6.0"
+  },
   "packageManager": "pnpm@11.20.0",
   "scripts": {
     "dev": "next dev",
     "start": "next start",
     "build": "next build",
     "typecheck": "tsc --noEmit",
+    "test:appearance": "node --experimental-strip-types --test features/interface/domain/appearance.test.mjs",
+    "test:todo": "node --experimental-strip-types --test features/todo/domain/todoTask.test.mjs",
+    "test:habits": "node --experimental-strip-types --test features/habits/domain/habitSchedule.test.mjs",
+    "test:daily-log": "node --experimental-strip-types --test features/daily-log/domain/workRatio.test.mjs",
+    "test:emotional": "node --experimental-strip-types --test features/emotional/domain/emotionalReview.test.mjs",
+    "test:calendar": "node --experimental-strip-types --test features/calendar/domain/calendarLayers.test.mjs",
+    "test:time-allocation": "node --experimental-strip-types --test features/time-allocation/domain/allocationPeriod.test.mjs features/time-allocation/domain/timeAllocationParser.test.mjs",
     "test:api": "scripts\\test-api.cmd",
-    "check": "pnpm typecheck && pnpm test:api && pnpm build",
+    "check": "pnpm typecheck && pnpm test:appearance && pnpm test:todo && pnpm test:habits && pnpm test:daily-log && pnpm test:emotional && pnpm test:calendar && pnpm test:time-allocation && pnpm test:api && pnpm build",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
@@ -18,6 +28,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@fullcalendar/daygrid": "6.1.21",
+    "@fullcalendar/core": "6.1.21",
     "@fullcalendar/interaction": "6.1.21",
     "@fullcalendar/react": "6.1.21",
     "@fullcalendar/timegrid": "6.1.21",

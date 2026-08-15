@@ -8,13 +8,15 @@ export function DurationInput({
   value,
   onChange,
   placeholder = "1h 30m",
-  showStored = true
+  showStored = true,
+  disabled = false
 }: {
   label: string;
   value: number;
   onChange: (value: number) => void;
   placeholder?: string;
   showStored?: boolean;
+  disabled?: boolean;
 }) {
   const [draft, setDraft] = useState(formatDuration(value));
 
@@ -39,6 +41,7 @@ export function DurationInput({
         type="text"
         inputMode="text"
         value={draft}
+        disabled={disabled}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={() => commit()}
         onKeyDown={(event) => {

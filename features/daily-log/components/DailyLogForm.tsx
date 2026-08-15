@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, ChevronDown, Clock3, Mic, Moon, Save, Send, Square, X, Zap } from "lucide-react";
+import { Ban, ChevronDown, Clock3, Mic, Moon, PencilLine, Save, Send, Square, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DurationInput } from "@/components/DurationInput";
 import { ScoreCard } from "@/components/ScoreCard";
@@ -27,11 +27,14 @@ import {
 } from "@/features/daily-log/api/dailyLogApi";
 import { listTags } from "@/features/shared/api/tagsApi";
 import type { Tag } from "@/features/shared/domain/tagCompany";
+import { useLocale } from "@/features/interface/localization/LocaleProvider";
 import {
+  calculateWorkRatio,
   createDailyLogDraft,
   parseStoredDailyLogDraft,
   resolveMainBlocker,
   sanitizeDailyLogDraft,
+  workRatioLevel,
   type DailyLogDraft,
   type DayLogStatus
 } from "@/features/daily-log/domain/dailyLog";
@@ -47,6 +50,8 @@ export function DailyLogForm({
   defaultSleepDelayMin: number;
   calorieTarget: number;
 }) {
+  const { locale } = useLocale();
+  const copy = DAILY_LOG_COPY[locale];
   const [log, setLog] = useState<DailyLogDraft>(createDailyLogDraft(selectedDate, defaultSleepDelayMin, calorieTarget));
   const [metrics, setMetrics] = useState<DailyLogResponse["todoMetrics"] | null>(null);
   const [calendar, setCalendar] = useState<DailyLogResponse["calendarContext"] | null>(null);
@@ -54,6 +59,7 @@ export function DailyLogForm({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [saveState, setSaveState] = useState("Restoring");
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [recordCreatedAt, setRecordCreatedAt] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioFileName, setAudioFileName] = useState("");
@@ -93,6 +99,7 @@ export function DailyLogForm({
         setMetrics(server.todoMetrics);
         setCalendar(server.calendarContext);
         setScores(server.log);
+        setRecordCreatedAt(server.log?.createdAt ?? null);
         setSaveState(shouldRestoreLocalDraft ? "Local draft restored" : "Restored");
         setLastSavedAt(server.log?.updatedAt ? new Date(server.log.updatedAt) : null);
         loaded.current = true;
@@ -196,6 +203,7 @@ export function DailyLogForm({
         setMetrics(response.todoMetrics);
         setCalendar(response.calendarContext);
         setScores(response.log);
+        setRecordCreatedAt(response.log?.createdAt ?? null);
         setLastSavedAt(new Date());
         setSaveState(successLabel);
       })
@@ -301,21 +309,37 @@ export function DailyLogForm({
     const seconds = Math.max(0, Math.round((now.getTime() - lastSavedAt.getTime()) / 1000));
     return `Autosaved ${seconds}s ago`;
   }, [lastSavedAt, now, saveState]);
+  const workRatio = useMemo(
+    () => calculateWorkRatio(log.workTimeMinutes, log.distractionTimeMinutes),
+    [log.distractionTimeMinutes, log.workTimeMinutes]
+  );
+  const ratioLevel = workRatioLevel(workRatio);
 
   return (
     <div>
       <div className="mb-6 flex flex-col justify-between gap-3 md:flex-row md:items-end">
         <div>
           <p className="text-sm font-semibold uppercase text-accent">{formatDisplayDate(selectedDate)}</p>
-          <h1 className="mt-1 text-3xl font-semibold text-ink">Daily Log</h1>
+          <h1 className="mt-1 text-3xl font-semibold text-ink">{copy.title}</h1>
           <p className="mt-2 flex items-center gap-2 text-sm text-muted">
             <Zap className="h-4 w-4 text-accent" />
-            Quick pass: sliders, training, sleep. Full pass: add one short summary.
+            {copy.detail}
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-md border border-line bg-panel px-3 py-2 text-sm font-semibold text-muted">
           <Save className="h-4 w-4" />
           {autosaveLabel}
+        </div>
+      </div>
+
+      <div className="mb-4 flex flex-col gap-2 rounded-md border border-line bg-panel px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 text-ink">
+          <PencilLine className="h-4 w-4 text-accent" />
+          <span className="font-semibold">{recordCreatedAt ? copy.editingSaved : copy.creating}</span>
+        </div>
+        <div className="text-muted">
+          {copy.logDate}: <strong className="text-ink">{selectedDate}</strong>
+          {recordCreatedAt ? <> · {copy.created}: <time dateTime={recordCreatedAt}>{new Date(recordCreatedAt).toLocaleString(locale === "fr" ? "fr-FR" : "en-US")}</time></> : null}
         </div>
       </div>
 
@@ -347,33 +371,33 @@ export function DailyLogForm({
             />
           </div>
           <div className="space-y-4 border-t border-line pt-4">
-            <p className="text-sm font-semibold text-ink">Summary reflection</p>
+            <p className="text-sm font-semibold text-ink">{copy.reflection}</p>
             <ListField
-              label="Wins"
-              placeholder="Something that went well"
+              label={copy.wins}
+              placeholder={copy.winPlaceholder}
               values={log.wins}
               onChange={(wins) => update({ wins })}
             />
             <ListField
-              label="Top 3 things to improve"
-              placeholder="One concrete improvement"
+              label={copy.improvements}
+              placeholder={copy.improvementPlaceholder}
               values={log.topImprovements}
               onChange={(topImprovements) => update({ topImprovements })}
               max={3}
             />
             <ListField
-              label="Blockers"
-              placeholder="What got in the way"
+              label={copy.blockers}
+              placeholder={copy.blockerPlaceholder}
               values={log.blockers}
               onChange={(blockers) => update({ blockers })}
             />
             <ListField
-              label="Tomorrow's priorities"
-              placeholder="What matters most tomorrow"
+              label={copy.tomorrow}
+              placeholder={copy.tomorrowPlaceholder}
               values={log.tomorrowPriorities}
               onChange={(tomorrowPriorities) => update({ tomorrowPriorities })}
             />
-            <TagsField value={log.tags} onChange={(tags) => update({ tags })} tags={availableTags} />
+            <TagsField value={log.tags} onChange={(tags) => update({ tags })} tags={availableTags} label={copy.tags} placeholder={copy.addTag} removeTagLabel={(name) => copy.removeTag.replace("{name}", name)} />
             <CustomFieldsEditor value={log.customFields} onChange={(customFields) => update({ customFields })} />
           </div>
 
@@ -503,6 +527,19 @@ export function DailyLogForm({
         </Panel>
 
         <div className="space-y-4">
+          <Panel>
+            <FieldLabel>{copy.workRatio}</FieldLabel>
+            <div className={`mt-3 rounded-md border px-4 py-4 ${RATIO_TONES[ratioLevel]}`}>
+              <div className="flex items-end justify-between gap-3">
+                <strong className="text-3xl">{workRatio === null ? "—" : `${Math.round(workRatio * 100)}%`}</strong>
+                <span className="text-sm font-semibold uppercase">{copy[ratioLevel]}</span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-shell/70">
+                <div className="h-full rounded-full bg-current transition-[width]" style={{ width: `${Math.round((workRatio ?? 0) * 100)}%` }} />
+              </div>
+              <p className="mt-2 text-xs opacity-85">{copy.ratioFormula}</p>
+            </div>
+          </Panel>
           <ScoreCard
             executionScore={scores?.executionScore}
             stateScore={scores?.stateScore ?? stateScorePreview}
@@ -549,7 +586,7 @@ export function DailyLogForm({
             </IconButton>
             <PrimaryButton onClick={submit}>
               <Send className="h-4 w-4" />
-              Submit log
+              {recordCreatedAt ? copy.updateLog : copy.submitLog}
             </PrimaryButton>
           </div>
         </div>
@@ -691,3 +728,19 @@ function audioExtension(mimeType: string) {
   if (mimeType.includes("mp4")) return "m4a";
   return "webm";
 }
+
+const RATIO_TONES = {
+  red: "border-risk/50 bg-risk/12 text-risk",
+  orange: "border-orange-400/50 bg-orange-400/12 text-orange-300",
+  yellow: "border-yellow-300/50 bg-yellow-300/12 text-yellow-200",
+  green: "border-good/50 bg-good/12 text-good"
+} as const;
+
+const DAILY_LOG_COPY = {
+  en: {
+    title: "Daily Log", detail: "Quick pass: sliders, training, sleep. Full pass: add one short summary.", editingSaved: "Editing a saved entry", creating: "Creating a new entry", logDate: "Log date", created: "Created", reflection: "Summary reflection", wins: "Wins", winPlaceholder: "Something that went well", improvements: "Top 3 things to improve", improvementPlaceholder: "One concrete improvement", blockers: "Blockers", blockerPlaceholder: "What got in the way", tomorrow: "Tomorrow's priorities", tomorrowPlaceholder: "What matters most tomorrow", tags: "Tags", addTag: "Add a tag", removeTag: "Remove {name} tag", workRatio: "Work / entertainment ratio", ratioFormula: "Work ÷ (work + distraction). A fully work-focused ratio of 1 is green.", red: "red", orange: "orange", yellow: "yellow", green: "green", submitLog: "Submit log", updateLog: "Update saved log"
+  },
+  fr: {
+    title: "Journal quotidien", detail: "Passage rapide : curseurs, entraînement, sommeil. Passage complet : ajoutez un bref résumé.", editingSaved: "Modification d’une entrée enregistrée", creating: "Création d’une nouvelle entrée", logDate: "Date du journal", created: "Créée le", reflection: "Bilan synthétique", wins: "Réussites", winPlaceholder: "Ce qui s’est bien passé", improvements: "Trois améliorations prioritaires", improvementPlaceholder: "Une amélioration concrète", blockers: "Blocages", blockerPlaceholder: "Ce qui a gêné", tomorrow: "Priorités de demain", tomorrowPlaceholder: "Ce qui compte le plus demain", tags: "Tags", addTag: "Ajouter un tag", removeTag: "Retirer le tag {name}", workRatio: "Ratio travail / divertissement", ratioFormula: "Travail ÷ (travail + distraction). Un ratio de 1, entièrement consacré au travail, est vert.", red: "rouge", orange: "orange", yellow: "jaune", green: "vert", submitLog: "Envoyer le journal", updateLog: "Mettre à jour le journal"
+  }
+} as const;

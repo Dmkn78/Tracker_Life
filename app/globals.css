@@ -7,7 +7,8 @@
  * tailwind.config.ts via rgb(var(--color-x) / <alpha-value>) so utilities
  * like `bg-accent/12` keep working. `:root` holds the dark palette (the
  * app's original, unchanged look) so nothing shifts before next-themes
- * mounts; `.light` overrides it once the user switches themes.
+ * mounts. Each appearance class owns one complete palette. Adaptive reuses
+ * those same definitions through `data-adaptive-palette`.
  */
 :root {
   color-scheme: dark;
@@ -32,7 +33,8 @@
   background: #0d1118;
 }
 
-:root.light {
+:root.light,
+:root.adaptive[data-adaptive-palette="light"] {
   /* Tuned for readability in direct sunlight: near-white surfaces, near-black
      text, and every semantic color darkened enough to clear 4.5:1 on white. */
   color-scheme: light;
@@ -55,6 +57,71 @@
     radial-gradient(circle at bottom right, rgba(71, 85, 105, 0.04), transparent 320px),
     linear-gradient(180deg, #f8f9fc 0%, #f4f5f9 48%, #f1f2f7 100%);
   background: #f4f5f9;
+}
+
+:root.sunlight,
+:root.adaptive[data-adaptive-palette="sunlight"] {
+  color-scheme: light;
+  --color-ink: 0 0 0;
+  --color-muted: 30 41 59;
+  --color-paper: 255 255 255;
+  --color-shell: 248 250 252;
+  --color-panel: 255 255 255;
+  --color-panel2: 241 245 249;
+  --color-line: 148 163 184;
+  --color-accent: 29 52 155;
+  --color-onaccent: 255 255 255;
+  --color-violet: 80 35 170;
+  --color-blueglass: 30 64 175;
+  --color-good: 0 95 63;
+  --color-warn: 112 65 0;
+  --color-risk: 168 28 42;
+  --body-gradient: linear-gradient(180deg, #ffffff 0%, #f8fafc 52%, #f1f5f9 100%);
+  background: #ffffff;
+}
+
+:root.low-light,
+:root.adaptive[data-adaptive-palette="low-light"] {
+  color-scheme: dark;
+  --color-ink: 210 214 220;
+  --color-muted: 145 150 160;
+  --color-paper: 7 9 12;
+  --color-shell: 10 13 17;
+  --color-panel: 13 16 21;
+  --color-panel2: 17 20 26;
+  --color-line: 48 52 61;
+  --color-accent: 128 145 220;
+  --color-onaccent: 5 7 10;
+  --color-violet: 145 125 205;
+  --color-blueglass: 151 164 207;
+  --color-good: 85 165 130;
+  --color-warn: 198 158 87;
+  --color-risk: 202 112 116;
+  --body-gradient: linear-gradient(180deg, #07090c 0%, #0a0d11 52%, #07090c 100%);
+  background: #07090c;
+}
+
+:root.warm,
+:root.adaptive[data-adaptive-palette="warm"] {
+  color-scheme: dark;
+  --color-ink: 249 238 220;
+  --color-muted: 190 170 145;
+  --color-paper: 24 17 13;
+  --color-shell: 31 22 17;
+  --color-panel: 38 27 20;
+  --color-panel2: 45 32 24;
+  --color-line: 73 53 41;
+  --color-accent: 230 154 91;
+  --color-onaccent: 35 16 4;
+  --color-violet: 193 137 199;
+  --color-blueglass: 205 176 137;
+  --color-good: 110 185 129;
+  --color-warn: 238 187 97;
+  --color-risk: 231 125 112;
+  --body-gradient:
+    radial-gradient(circle at top left, rgba(230, 154, 91, 0.11), transparent 360px),
+    linear-gradient(180deg, #18110d 0%, #201712 52%, #18110d 100%);
+  background: #18110d;
 }
 
 html {
@@ -81,6 +148,20 @@ body {
   color: rgb(var(--color-ink));
   min-height: 100vh;
   overflow-x: clip;
+  text-size-adjust: 100%;
+}
+
+/* Legacy Slate utilities inherit the semantic palette until their owning
+   screens are migrated, keeping every appearance readable in the meantime. */
+.text-slate-50,
+.text-slate-100,
+.text-slate-300 {
+  color: rgb(var(--color-ink));
+}
+
+.text-slate-400,
+.text-slate-500 {
+  color: rgb(var(--color-muted));
 }
 
 button,
@@ -88,6 +169,19 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+@media (max-width: 640px) {
+  body {
+    line-height: 1.5;
+  }
+
+  button,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+  select,
+  textarea {
+    min-height: 44px;
+  }
 }
 
 img,
@@ -168,72 +262,150 @@ input[type="range"] {
   padding-bottom: 1rem;
 }
 
-.life-terminal-calendar {
-  --fc-page-bg-color: #131a25;
-  --fc-neutral-bg-color: #161d29;
-  --fc-border-color: rgba(255, 255, 255, 0.08);
-  --fc-button-bg-color: rgba(255, 255, 255, 0.04);
-  --fc-button-border-color: rgba(255, 255, 255, 0.08);
-  --fc-button-hover-bg-color: rgba(255, 255, 255, 0.08);
-  --fc-button-hover-border-color: rgba(255, 255, 255, 0.12);
-  --fc-button-active-bg-color: rgba(141, 162, 251, 0.18);
-  --fc-button-active-border-color: rgba(141, 162, 251, 0.4);
-  --fc-today-bg-color: rgba(141, 162, 251, 0.08);
-  --fc-now-indicator-color: #ff7b83;
-  color: #cbd5e1;
+.calendar-engine {
+  --fc-page-bg-color: rgb(var(--color-panel));
+  --fc-neutral-bg-color: rgb(var(--color-panel2) / 0.72);
+  --fc-border-color: rgb(var(--color-line) / 0.8);
+  --fc-today-bg-color: rgb(var(--color-accent) / 0.08);
+  --fc-now-indicator-color: rgb(var(--color-risk));
+  color: rgb(var(--color-ink));
 }
 
-.life-terminal-calendar .fc {
+.calendar-engine-terminal {
   font-size: 12px;
 }
 
-.life-terminal-calendar .fc-toolbar-title {
-  color: #f8fafc;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.calendar-engine .fc {
+  font-size: 13px;
 }
 
-.life-terminal-calendar .fc-button {
+.calendar-engine .fc-scrollgrid,
+.calendar-engine .fc-theme-standard td,
+.calendar-engine .fc-theme-standard th {
+  border-color: rgb(var(--color-line) / 0.8);
+}
+
+.calendar-engine .fc-col-header-cell,
+.calendar-engine .fc-timegrid-slot-label,
+.calendar-engine .fc-daygrid-day-number {
+  color: rgb(var(--color-muted));
+}
+
+.calendar-engine .fc-daygrid-day-number {
+  padding: 0.45rem;
+}
+
+.calendar-engine .fc-event {
   border-radius: 6px;
   box-shadow: none;
-  font-size: 11px;
+}
+
+.calendar-event-content {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 0.3rem;
+  padding: 0.12rem 0.22rem;
+  white-space: normal;
+}
+
+.calendar-event-layer-mark {
+  margin-top: 0.32rem;
+  height: 0.34rem;
+  width: 0.34rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.calendar-event-title {
+  display: -webkit-box;
+  overflow: hidden;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.calendar-engine .calendar-layer-events {
+  border-left-width: 3px;
   font-weight: 700;
-  text-transform: uppercase;
 }
 
-.life-terminal-calendar .fc-col-header-cell,
-.life-terminal-calendar .fc-timegrid-slot-label,
-.life-terminal-calendar .fc-daygrid-day-number {
-  color: #94a3b8;
+.calendar-engine .calendar-layer-todo {
+  --fc-event-bg-color: rgb(var(--color-panel2) / 0.82);
+  --fc-event-border-color: rgb(var(--color-accent) / 0.65);
+  --fc-event-text-color: rgb(var(--color-ink));
+  border-style: dashed;
+  cursor: default;
+  font-weight: 600;
 }
 
-.life-terminal-calendar .fc-event {
-  border-radius: 4px;
-  font-weight: 700;
+.calendar-engine .calendar-layer-allocations {
+  border-style: dashed;
+  color: rgb(var(--color-ink));
+  opacity: 0.9;
 }
 
-.life-terminal-calendar .fc-impact-low {
-  --fc-event-bg-color: rgba(52, 211, 153, 0.16);
-  --fc-event-border-color: rgba(52, 211, 153, 0.55);
-  --fc-event-text-color: #d1fae5;
+.calendar-engine .calendar-layer-allocations .fc-event-main {
+  color: inherit;
+  font-weight: 600;
 }
 
-.life-terminal-calendar .fc-impact-medium {
-  --fc-event-bg-color: rgba(141, 162, 251, 0.18);
-  --fc-event-border-color: rgba(141, 162, 251, 0.48);
-  --fc-event-text-color: #dfe7ff;
+.calendar-engine .calendar-layer-routines {
+  --fc-event-bg-color: rgb(var(--color-violet) / 0.13);
+  --fc-event-border-color: rgb(var(--color-violet) / 0.7);
+  --fc-event-text-color: rgb(var(--color-ink));
+  border-left-width: 4px;
+  border-style: dashed;
 }
 
-.life-terminal-calendar .fc-impact-high {
-  --fc-event-bg-color: rgba(251, 191, 36, 0.18);
-  --fc-event-border-color: rgba(251, 191, 36, 0.68);
-  --fc-event-text-color: #fef3c7;
+.calendar-layer-toggle-routines {
+  border-left: 4px dashed rgb(var(--color-violet));
 }
 
-.life-terminal-calendar .fc-impact-critical {
-  --fc-event-bg-color: rgba(251, 113, 133, 0.18);
-  --fc-event-border-color: rgba(251, 113, 133, 0.72);
-  --fc-event-text-color: #ffe4e6;
+.calendar-layer-toggle-events {
+  border-left: 3px solid rgb(var(--color-violet));
+}
+
+.calendar-layer-toggle-todo {
+  border-left: 3px dashed rgb(var(--color-accent));
+}
+
+.calendar-engine .fc-impact-low {
+  --fc-event-bg-color: rgb(var(--color-good) / 0.16);
+  --fc-event-border-color: rgb(var(--color-good) / 0.62);
+  --fc-event-text-color: rgb(var(--color-ink));
+}
+
+.calendar-engine .fc-impact-medium {
+  --fc-event-bg-color: rgb(var(--color-accent) / 0.17);
+  --fc-event-border-color: rgb(var(--color-accent) / 0.58);
+  --fc-event-text-color: rgb(var(--color-ink));
+}
+
+.calendar-engine .fc-impact-high {
+  --fc-event-bg-color: rgb(var(--color-warn) / 0.18);
+  --fc-event-border-color: rgb(var(--color-warn) / 0.68);
+  --fc-event-text-color: rgb(var(--color-ink));
+}
+
+.calendar-engine .fc-impact-critical {
+  --fc-event-bg-color: rgb(var(--color-risk) / 0.18);
+  --fc-event-border-color: rgb(var(--color-risk) / 0.72);
+  --fc-event-text-color: rgb(var(--color-ink));
+}
+
+@media (max-width: 640px) {
+  .calendar-engine .fc {
+    font-size: 12px;
+  }
+
+  .calendar-engine .fc-timegrid-slot {
+    height: 2.4rem;
+  }
+
+  .calendar-engine .fc-daygrid-day-frame {
+    min-height: 5.5rem;
+  }
 }

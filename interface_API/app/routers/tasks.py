@@ -67,6 +67,7 @@ def serialize_task(
         "estimatedMinutes": task.estimatedMinutes,
         "completionPercent": task.completionPercent,
         "status": task.status.lower(),
+        "notDoneReason": task.notDoneReason,
         "sortOrder": task.sortOrder,
         "objectiveId": task.objectiveId,
         "objectiveTitle": objective_title if objective_title is not None else _objective_title(db, task.objectiveId),
@@ -97,10 +98,14 @@ def list_tasks(
         .where(Task.userId == user.id)
     )
     if from_ or to:
+        range_start = parse_date_key(from_) if from_ else None
+        range_end = parse_date_key(to) if to else None
+        if range_start and range_end and range_start > range_end:
+            raise HTTPException(status_code=400, detail="Invalid task date range")
         if from_:
-            query = query.where(Task.date >= parse_date_key(from_))
+            query = query.where(Task.date >= range_start)
         if to:
-            query = query.where(Task.date <= parse_date_key(to))
+            query = query.where(Task.date <= range_end)
     elif scope != "all":
         date_key = add_days(to_date_key(), 1) if scope == "tomorrow" else (date or to_date_key())
         query = query.where(Task.date == parse_date_key(date_key))
@@ -149,6 +154,7 @@ def _create_one_task(db: Session, user: User, item) -> Task:
         estimatedMinutes=item.estimated_minutes,
         completionPercent=item.completion_percent,
         status=item.status.value,
+        notDoneReason=item.not_done_reason if item.status.value == "NOT_DONE" else None,
     )
     db.add(task)
     db.flush()
@@ -213,6 +219,12 @@ def update_task(
         existing.completionPercent = body.completion_percent
     if body.status is not None:
         existing.status = body.status.value
+    next_status = body.status.value if body.status is not None else existing.status
+    if next_status == "NOT_DONE":
+        if "not_done_reason" in provided_fields:
+            existing.notDoneReason = body.not_done_reason
+    else:
+        existing.notDoneReason = None
     if body.sort_order is not None:
         existing.sortOrder = body.sort_order
     db.flush()

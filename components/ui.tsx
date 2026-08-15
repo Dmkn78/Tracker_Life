@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, HTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, HTMLAttributes, LabelHTMLAttributes } from "react";
 import { X } from "lucide-react";
 
 export function Card({
@@ -113,8 +113,8 @@ export function Metric({
   );
 }
 
-export function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="text-sm font-medium text-muted">{children}</label>;
+export function FieldLabel({ className = "", ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
+  return <label {...props} className={`text-sm font-medium text-muted ${className}`} />;
 }
 
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
@@ -241,9 +241,10 @@ export function Drawer({
 
 export function Segmented({
   className = "",
+  role = "group",
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
-  return <div {...props} className={`inline-flex max-w-full flex-wrap rounded-2xl bg-panel2/70 p-1 ring-1 ring-line ${className}`} />;
+  return <div {...props} role={role} className={`inline-flex max-w-full flex-wrap rounded-2xl bg-panel2/70 p-1 ring-1 ring-line ${className}`} />;
 }
 
 export function SegmentedButton({
@@ -255,6 +256,7 @@ export function SegmentedButton({
   return (
     <button
       {...props}
+      aria-pressed={active}
       className={`focus-ring inline-flex min-h-9 items-center justify-center rounded-[14px] px-3 text-sm font-medium transition ${
         active ? "bg-panel text-ink shadow-[0_1px_0_rgb(var(--color-line))] ring-1 ring-line" : "text-muted hover:text-ink"
       } ${className}`}

@@ -21,6 +21,7 @@ export type DailyLogScores = {
 
 export type DailyLogRecord = Partial<DailyLogDraft> &
   DailyLogScores & {
+    createdAt?: string | null;
     updatedAt?: string | null;
   };
 
@@ -94,6 +95,7 @@ function parseDailyLogRecord(payload: unknown): DailyLogRecord {
     riskScore: optionalNullableNumber(record.riskScore, "log.riskScore"),
     riskDelta: optionalNullableNumber(record.riskDelta, "log.riskDelta"),
     riskAcceleration: optionalNullableNumber(record.riskAcceleration, "log.riskAcceleration"),
+    createdAt: optionalNullableString(record.createdAt, "log.createdAt"),
     updatedAt: optionalNullableString(record.updatedAt, "log.updatedAt")
   };
 }

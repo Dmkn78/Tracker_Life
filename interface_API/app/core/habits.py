@@ -2,25 +2,29 @@
 
 from __future__ import annotations
 
+from datetime import datetime, time, timedelta
+
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from ..models import Habit, HabitCheckin, RoutineBlock, utcnow
+from ..models import Habit, HabitCheckin, HabitTemplate, RoutineBlock, utcnow
 from .dates import add_days, parse_date_key, to_date_key
+from .habit_schedule import end_time_for_duration, is_scheduled_on, normalize_recurrence_days, routine_occurrence_bounds
 from .numbers import javascript_round
 
 
 def get_habit_tracker_data(db: Session, user_id: str, date_key: str | None = None) -> dict:
     date_key = date_key or to_date_key()
     day = parse_date_key(date_key)
-    habits = list(
+    all_habits = list(
         db.execute(
             select(Habit)
             .where(Habit.userId == user_id, Habit.active.is_(True))
             .order_by(Habit.sortOrder.asc(), Habit.createdAt.asc())
         ).scalars()
     )
+    habits = [habit for habit in all_habits if is_scheduled_on(day, habit.recurrenceDays)]
     checkins = list(
         db.execute(
             select(HabitCheckin).where(HabitCheckin.userId == user_id, HabitCheckin.date == day)
@@ -32,7 +36,6 @@ def get_habit_tracker_data(db: Session, user_id: str, date_key: str | None = Non
             .where(
                 RoutineBlock.userId == user_id,
                 RoutineBlock.active.is_(True),
-                RoutineBlock.dayType == "school_day",
             )
             .order_by(RoutineBlock.sortOrder.asc())
         ).scalars()
@@ -49,10 +52,27 @@ def get_habit_tracker_data(db: Session, user_id: str, date_key: str | None = Non
         ).scalars()
     )
 
+    routine_blocks = [block for block in routine_blocks if is_scheduled_on(day, block.recurrenceDays)]
+    scheduled_habit_ids = {habit.id for habit in habits}
     checkin_by_habit = {checkin.habitId: checkin for checkin in checkins}
-    completed_today = len([checkin for checkin in checkins if checkin.status == "done"])
-    seven_day_possible = len(habits) * 7
-    seven_day_done = len([checkin for checkin in recent_checkins if checkin.status == "done"])
+    completed_today = len([
+        checkin for checkin in checkins
+        if checkin.habitId in scheduled_habit_ids and checkin.status == "done"
+    ])
+    recent_start = parse_date_key(add_days(date_key, -6))
+    seven_day_possible = sum(
+        1
+        for habit in all_habits
+        for offset in range(7)
+        if is_scheduled_on(recent_start + timedelta(days=offset), habit.recurrenceDays)
+    )
+    habit_by_id = {habit.id: habit for habit in all_habits}
+    seven_day_done = len([
+        checkin for checkin in recent_checkins
+        if checkin.status == "done"
+        and checkin.habitId in habit_by_id
+        and is_scheduled_on(checkin.date, habit_by_id[checkin.habitId].recurrenceDays)
+    ])
 
     def habit_payload(habit: Habit) -> dict:
         checkin = checkin_by_habit.get(habit.id)
@@ -63,6 +83,8 @@ def get_habit_tracker_data(db: Session, user_id: str, date_key: str | None = Non
             "description": habit.description,
             "targetTime": habit.targetTime,
             "defaultExpectedMinutes": habit.defaultExpectedMinutes,
+            "recurrenceDays": habit.recurrenceDays,
+            "timeBlockEnabled": habit.timeBlockEnabled,
             "sortOrder": habit.sortOrder,
             "source": habit.source,
             "checkin": (
@@ -85,6 +107,7 @@ def get_habit_tracker_data(db: Session, user_id: str, date_key: str | None = Non
                 "id": block.id,
                 "habitId": block.habitId,
                 "dayType": block.dayType,
+                "recurrenceDays": block.recurrenceDays,
                 "label": block.label,
                 "startTime": block.startTime,
                 "endTime": block.endTime,
@@ -92,6 +115,13 @@ def get_habit_tracker_data(db: Session, user_id: str, date_key: str | None = Non
             }
             for block in routine_blocks
         ],
+        "templates": [serialize_habit_template(template) for template in list(
+            db.execute(
+                select(HabitTemplate)
+                .where(HabitTemplate.userId == user_id)
+                .order_by(HabitTemplate.createdAt.asc())
+            ).scalars()
+        )],
         "metrics": {
             "completedToday": completed_today,
             "totalToday": len(habits),
@@ -105,6 +135,96 @@ def get_habit_tracker_data(db: Session, user_id: str, date_key: str | None = Non
             ),
         },
     }
+
+
+def serialize_habit_template(template: HabitTemplate) -> dict:
+    return {
+        "id": template.id,
+        "name": template.name,
+        "category": template.category,
+        "description": template.description,
+        "targetTime": template.targetTime,
+        "defaultExpectedMinutes": template.defaultExpectedMinutes,
+        "recurrenceDays": template.recurrenceDays,
+        "timeBlockEnabled": template.timeBlockEnabled,
+    }
+
+
+def synchronize_habit_routine_block(db: Session, habit: Habit) -> None:
+    blocks = list(
+        db.execute(
+            select(RoutineBlock)
+            .where(RoutineBlock.userId == habit.userId, RoutineBlock.habitId == habit.id)
+            .order_by(RoutineBlock.createdAt.asc())
+        ).scalars()
+    )
+    should_enable = bool(
+        habit.active
+        and habit.timeBlockEnabled
+        and habit.targetTime
+        and habit.defaultExpectedMinutes > 0
+    )
+    if not should_enable:
+        for block in blocks:
+            block.active = False
+        return
+
+    block = blocks[0] if blocks else RoutineBlock(userId=habit.userId, habitId=habit.id)
+    block.dayType = "recurring"
+    block.recurrenceDays = normalize_recurrence_days(habit.recurrenceDays)
+    block.label = habit.name
+    block.startTime = habit.targetTime or "09:00"
+    block.endTime = end_time_for_duration(block.startTime, habit.defaultExpectedMinutes)
+    block.sortOrder = habit.sortOrder
+    block.active = True
+    if not blocks:
+        db.add(block)
+    for extra_block in blocks[1:]:
+        extra_block.active = False
+
+
+def get_calendar_routine_plans(db: Session, user_id: str, from_key: str, to_key: str) -> dict:
+    range_start = parse_date_key(from_key)
+    range_end = parse_date_key(to_key)
+    if range_end < range_start:
+        raise ValueError("to must be after from")
+    if (range_end - range_start).days > 93:
+        raise ValueError("routine calendar range cannot exceed 94 days")
+    blocks = list(
+        db.execute(
+            select(RoutineBlock, Habit)
+            .join(Habit, Habit.id == RoutineBlock.habitId)
+            .where(
+                RoutineBlock.userId == user_id,
+                RoutineBlock.active.is_(True),
+                Habit.userId == user_id,
+                Habit.active.is_(True),
+            )
+            .order_by(RoutineBlock.sortOrder.asc())
+        ).all()
+    )
+    occurrences = []
+    range_start_at_midnight = datetime.combine(range_start, time.min)
+    range_end_exclusive = datetime.combine(range_end + timedelta(days=1), time.min)
+    day = range_start - timedelta(days=1)
+    while day <= range_end:
+        for block, habit in blocks:
+            if not is_scheduled_on(day, block.recurrenceDays):
+                continue
+            start, end = routine_occurrence_bounds(day, block.startTime, block.endTime)
+            if end <= range_start_at_midnight or start >= range_end_exclusive:
+                continue
+            occurrences.append({
+                "id": f"{block.id}:{day.isoformat()}",
+                "blockId": block.id,
+                "habitId": habit.id,
+                "title": block.label,
+                "category": habit.category,
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+            })
+        day += timedelta(days=1)
+    return {"from": from_key, "to": to_key, "routines": occurrences}
 
 
 def upsert_habit_checkin(

@@ -13,6 +13,7 @@ from .routers import (
     calendar_events,
     companies,
     daily_log,
+    emotional_reviews,
     habits,
     history,
     life_terminal,
@@ -80,6 +81,7 @@ def health() -> dict[str, bool]:
 
 app.include_router(auth.router)
 app.include_router(daily_log.router)
+app.include_router(emotional_reviews.router)
 app.include_router(tasks.router)
 app.include_router(calendar_events.router)
 app.include_router(habits.router)

@@ -12,10 +12,21 @@ import type {
 } from "../domain/calendarEvent";
 
 export function listCalendarEvents(
-  from: string,
-  signal?: AbortSignal
+  {
+    from,
+    to,
+    eventStart,
+    eventEndExclusive,
+    signal
+  }: {
+    from: string;
+    to: string;
+    eventStart: string;
+    eventEndExclusive: string;
+    signal?: AbortSignal;
+  }
 ): Promise<CalendarEvent[]> {
-  const query = new URLSearchParams({ from });
+  const query = new URLSearchParams({ from, to, eventStart, eventEndExclusive });
   return requestJson(
     `/api/calendar-events?${query.toString()}`,
     parseCalendarEventsResponse,

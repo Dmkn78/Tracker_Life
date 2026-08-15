@@ -12,12 +12,21 @@ from ..security import get_current_user
 from ..core.dates import iso_datetime, to_date_key
 from ..core.task_time_breakdown import get_task_time_breakdown
 from ..core.time_allocation import (
+    get_calendar_allocation_plans,
     get_time_allocation_data,
     upsert_daily_allocation,
     upsert_day_budget,
+    upsert_period_budget,
+    upsert_periodic_allocation,
 )
 
 router = APIRouter(prefix="/api/time-allocation", tags=["time-allocation"])
+
+
+def _resolve_period_date(period: str, date_key: str | None) -> str:
+    if date_key is None and period in ("week", "month"):
+        raise ValueError("date is required for week and month periods")
+    return date_key or to_date_key()
 
 
 @router.get("/tasks")
@@ -73,11 +82,30 @@ def _update_category(
 
 @router.get("")
 def get_time_allocation(
+    period: str = Query(default="day"),
     date: str | None = Query(default=None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return get_time_allocation_data(db, user.id, date or to_date_key())
+    if period not in ("day", "week", "month"):
+        raise HTTPException(status_code=400, detail="period must be 'day', 'week', or 'month'")
+    try:
+        return get_time_allocation_data(db, user.id, _resolve_period_date(period, date), period)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get("/calendar")
+def get_calendar_plans(
+    from_date: str = Query(alias="from"),
+    to_date: str = Query(alias="to"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return get_calendar_allocation_plans(db, user.id, from_date, to_date)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.post("")
@@ -107,20 +135,32 @@ def update_time_allocation(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if body.kind == "day_budget":
-        date_key = body.date.isoformat() if body.date else to_date_key()
-        upsert_day_budget(
-            db,
-            user_id=user.id,
-            date_key=date_key,
-            day_budget_minutes=body.day_budget_minutes
-            if body.day_budget_minutes is not None
-            else 12 * 60,
-        )
-        return get_time_allocation_data(db, user.id, date_key)
+    if body.kind in ("day_budget", "period_budget"):
+        date_key = _resolve_period_date(body.period, body.date.isoformat() if body.date else None)
+        try:
+            if body.period == "day":
+                upsert_day_budget(
+                    db,
+                    user_id=user.id,
+                    date_key=date_key,
+                    day_budget_minutes=body.day_budget_minutes
+                    if body.day_budget_minutes is not None
+                    else 12 * 60,
+                )
+            else:
+                upsert_period_budget(
+                    db,
+                    user_id=user.id,
+                    period=body.period,
+                    date_key=date_key,
+                    budget_minutes=body.period_budget_minutes or 0,
+                )
+            return get_time_allocation_data(db, user.id, date_key, body.period)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
     if body.kind == "allocation":
-        date_key = body.date.isoformat() if body.date else to_date_key()
+        date_key = _resolve_period_date(body.period, body.date.isoformat() if body.date else None)
         category = db.execute(
             select(TimeAllocationCategory).where(
                 TimeAllocationCategory.id == body.category_id,
@@ -129,20 +169,23 @@ def update_time_allocation(
         ).scalar_one_or_none()
         if category is None:
             raise HTTPException(status_code=400, detail="Invalid categoryId")
-        upsert_daily_allocation(
-            db,
-            user_id=user.id,
-            date_key=date_key,
-            category_id=body.category_id or "",
-            planned_minutes=body.planned_minutes,
-            planned_minutes_manual=body.planned_minutes_manual,
-            actual_minutes=body.actual_minutes,
-            note=body.note,
-        )
-        return get_time_allocation_data(db, user.id, date_key)
+        try:
+            if body.period == "day":
+                upsert_daily_allocation(
+                    db, user.id, date_key, body.category_id or "", body.planned_minutes,
+                    body.planned_minutes_manual, body.actual_minutes, body.note,
+                )
+            else:
+                upsert_periodic_allocation(
+                    db, user.id, body.period, date_key, body.category_id or "",
+                    body.planned_minutes, body.planned_minutes_manual, body.note,
+                )
+            return get_time_allocation_data(db, user.id, date_key, body.period)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
     if body.kind == "portfolio":
-        date_key = body.date.isoformat() if body.date else to_date_key()
+        date_key = _resolve_period_date(body.period, body.date.isoformat() if body.date else None)
         if body.id:
             category = db.execute(
                 select(TimeAllocationCategory).where(
@@ -166,17 +209,20 @@ def update_time_allocation(
             )
             db.add(category)
             db.flush()
-        upsert_daily_allocation(
-            db,
-            user_id=user.id,
-            date_key=date_key,
-            category_id=category.id,
-            planned_minutes=body.planned_minutes,
-            planned_minutes_manual=body.planned_minutes_manual,
-            actual_minutes=body.actual_minutes,
-            note=body.note,
-        )
-        return get_time_allocation_data(db, user.id, date_key)
+        try:
+            if body.period == "day":
+                upsert_daily_allocation(
+                    db, user.id, date_key, category.id, body.planned_minutes,
+                    body.planned_minutes_manual, body.actual_minutes, body.note,
+                )
+            else:
+                upsert_periodic_allocation(
+                    db, user.id, body.period, date_key, category.id,
+                    body.planned_minutes, body.planned_minutes_manual, body.note,
+                )
+            return get_time_allocation_data(db, user.id, date_key, body.period)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
     existing = db.execute(
         select(TimeAllocationCategory).where(
@@ -194,11 +240,18 @@ def update_time_allocation(
 def delete_category(
     id: str | None = Query(default=None),
     date: str | None = Query(default=None),
+    period: str = Query(default="day"),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     if not id:
         raise HTTPException(status_code=400, detail="Missing category id")
+    if period not in ("day", "week", "month"):
+        raise HTTPException(status_code=400, detail="Invalid period")
+    try:
+        date_key = _resolve_period_date(period, date)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     existing = db.execute(
         select(TimeAllocationCategory).where(
             TimeAllocationCategory.id == id, TimeAllocationCategory.userId == user.id
@@ -208,4 +261,4 @@ def delete_category(
         raise HTTPException(status_code=404, detail="Allocation category not found")
     existing.active = False
     db.flush()
-    return get_time_allocation_data(db, user.id, date or to_date_key())
+    return get_time_allocation_data(db, user.id, date_key, period)

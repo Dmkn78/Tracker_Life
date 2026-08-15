@@ -504,7 +504,7 @@ export function LifeTerminalClient({ data }: { data: LifeTerminalData }) {
         <TimeAllocationTerminalPanel data={data} />
       </div>
       <div className="grid gap-3 2xl:grid-cols-[1.2fr_0.8fr]">
-        <CalendarCommandCenter initialEvents={data.initialEvents} />
+        <CalendarCommandCenter today={data.today} initialEvents={data.initialEvents} />
         <TasksTerminalPanel data={data} />
       </div>
       <CollapsibleSection title="Planning and system details" defaultOpen={false}>

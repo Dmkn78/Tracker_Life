@@ -83,6 +83,22 @@ const STRING_ARRAY_FIELDS = [
 ] as const satisfies ReadonlyArray<keyof DailyLogDraft>;
 const MAX_TOP_IMPROVEMENTS = 3;
 
+export type WorkRatioLevel = "red" | "orange" | "yellow" | "green";
+
+export function calculateWorkRatio(workMinutes: number, distractionMinutes: number): number | null {
+  const safeWorkMinutes = Math.max(0, workMinutes);
+  const safeDistractionMinutes = Math.max(0, distractionMinutes);
+  const totalMinutes = safeWorkMinutes + safeDistractionMinutes;
+  return totalMinutes === 0 ? null : safeWorkMinutes / totalMinutes;
+}
+
+export function workRatioLevel(ratio: number | null): WorkRatioLevel {
+  if (ratio === null || ratio < 0.25) return "red";
+  if (ratio < 0.5) return "orange";
+  if (ratio < 0.75) return "yellow";
+  return "green";
+}
+
 export function createDailyLogDraft(
   date: string,
   defaultSleepDelayMin = 20,

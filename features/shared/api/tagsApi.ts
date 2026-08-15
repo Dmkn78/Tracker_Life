@@ -1,4 +1,4 @@
-import { expectJsonObject, expectString, requestJson } from "@/lib/http/apiClient";
+import { expectJsonObject, expectNumber, expectString, requestJson } from "@/lib/http/apiClient";
 import type { Tag } from "../domain/tagCompany";
 
 export function listTags(signal?: AbortSignal): Promise<Tag[]> {
@@ -24,6 +24,7 @@ function parseTag(payload: unknown, context: string): Tag {
   return {
     id: expectString(tag.id, `${context}.id`),
     name: expectString(tag.name, `${context}.name`),
-    color: expectString(tag.color, `${context}.color`)
+    color: expectString(tag.color, `${context}.color`),
+    usageCount: expectNumber(tag.usageCount, `${context}.usageCount`)
   };
 }

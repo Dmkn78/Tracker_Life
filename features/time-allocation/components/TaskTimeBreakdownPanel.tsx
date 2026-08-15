@@ -2,44 +2,52 @@
 
 import { useEffect, useState } from "react";
 import { formatDuration } from "@/components/DurationInput";
-import { Metric, Segmented, SegmentedButton, SoftPanel } from "@/components/ui";
+import { Metric, SoftPanel } from "@/components/ui";
 import { loadTaskTimeBreakdown } from "@/features/time-allocation/api/timeAllocationApi";
 import type {
   TaskTimeBreakdown,
   TaskTimeBreakdownEntry,
   TaskTimeBreakdownPeriod
 } from "@/features/time-allocation/domain/timeAllocation";
+import type { TimeAllocationPeriod } from "@/features/time-allocation/domain/allocationPeriod";
 import { ApiError } from "@/lib/http/apiClient";
+import { useLocale } from "@/features/interface/localization/LocaleProvider";
 
-export function TaskTimeBreakdownPanel({ date }: { date: string }) {
-  const [period, setPeriod] = useState<TaskTimeBreakdownPeriod>("week");
+export function TaskTimeBreakdownPanel({
+  date,
+  period,
+  refreshVersion
+}: {
+  date: string;
+  period: TimeAllocationPeriod;
+  refreshVersion: number;
+}) {
+  const { locale } = useLocale();
+  const copy = TASK_BREAKDOWN_COPY[locale];
+  const taskPeriod: TaskTimeBreakdownPeriod = period === "month" ? "month" : "week";
   const [data, setData] = useState<TaskTimeBreakdown | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const requestController = new AbortController();
     setError(null);
-    void loadTaskTimeBreakdown(period, date, requestController.signal)
+    void loadTaskTimeBreakdown(taskPeriod, date, requestController.signal)
       .then(setData)
       .catch((loadError: unknown) => {
         if (!requestController.signal.aborted) {
-          setError(loadError instanceof ApiError ? loadError.message : "Unable to load the task time breakdown.");
+          setError(loadError instanceof ApiError ? loadError.message : copy.loadError);
         }
       });
     return () => requestController.abort();
-  }, [period, date]);
+  }, [copy.loadError, taskPeriod, date, refreshVersion]);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted">Time from task estimates, grouped by tag and by company.</p>
-        <Segmented>
-          {(["week", "month"] as const).map((item) => (
-            <SegmentedButton key={item} active={period === item} onClick={() => setPeriod(item)}>
-              {item === "week" ? "This week" : "This month"}
-            </SegmentedButton>
-          ))}
-        </Segmented>
+        <p className="text-sm text-muted">{copy.detail}</p>
+        <span className="rounded-full bg-line/40 px-3 py-1 text-xs font-medium text-muted">
+          {taskPeriod === "week" ? copy.thisWeek : copy.thisMonth}
+        </span>
       </div>
 
       {error ? (
@@ -51,24 +59,24 @@ export function TaskTimeBreakdownPanel({ date }: { date: string }) {
       {data ? (
         <>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Metric label="Total planned" value={formatDuration(data.totalMinutes)} detail={`${data.taskCount} task${data.taskCount === 1 ? "" : "s"}`} />
+            <Metric label={copy.totalPlanned} value={formatDuration(data.totalMinutes)} detail={`${data.taskCount} ${data.taskCount === 1 ? copy.task : copy.tasks}`} />
             <Metric
-              label={data.period === "week" ? "Week" : "Month"}
+              label={data.period === "week" ? copy.week : copy.month}
               value={`${data.rangeStart} → ${data.rangeEnd}`}
             />
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <BreakdownList
-              title="By company"
+              title={copy.byCompany}
               entries={data.byCompany}
-              unassignedLabel="No company"
+              unassignedLabel={copy.noCompany}
               unassignedMinutes={data.noCompanyMinutes}
               totalMinutes={data.totalMinutes}
             />
             <BreakdownList
-              title="By tag"
+              title={copy.byTag}
               entries={data.byTag}
-              unassignedLabel="No tag"
+              unassignedLabel={copy.noTag}
               unassignedMinutes={data.untaggedMinutes}
               totalMinutes={data.totalMinutes}
             />
@@ -92,6 +100,8 @@ function BreakdownList({
   unassignedMinutes: number;
   totalMinutes: number;
 }) {
+  const { locale } = useLocale();
+  const copy = TASK_BREAKDOWN_COPY[locale];
   const rows = [
     ...entries,
     ...(unassignedMinutes > 0 ? [{ id: "__unassigned", name: unassignedLabel, color: "#5b6577", minutes: unassignedMinutes }] : [])
@@ -100,7 +110,7 @@ function BreakdownList({
     <SoftPanel className="p-4">
       <h3 className="text-sm font-semibold text-ink">{title}</h3>
       {rows.length === 0 ? (
-        <p className="mt-3 text-sm text-muted">No planned time in this period yet.</p>
+        <p className="mt-3 text-sm text-muted">{copy.empty}</p>
       ) : (
         <div className="mt-3 space-y-3">
           {rows.map((row) => {
@@ -125,3 +135,18 @@ function BreakdownList({
     </SoftPanel>
   );
 }
+
+const TASK_BREAKDOWN_COPY = {
+  en: {
+    detail: "Time from task estimates, grouped by tag and by company.", thisWeek: "This week", thisMonth: "This month",
+    totalPlanned: "Total planned", task: "task", tasks: "tasks", week: "Week", month: "Month", byCompany: "By company",
+    noCompany: "No company", byTag: "By tag", noTag: "No tag", empty: "No planned time in this period yet.",
+    loadError: "Unable to load the task time breakdown."
+  },
+  fr: {
+    detail: "Temps estimé des tâches, regroupé par étiquette et par entreprise.", thisWeek: "Cette semaine", thisMonth: "Ce mois",
+    totalPlanned: "Total planifié", task: "tâche", tasks: "tâches", week: "Semaine", month: "Mois", byCompany: "Par entreprise",
+    noCompany: "Sans entreprise", byTag: "Par étiquette", noTag: "Sans étiquette", empty: "Aucun temps planifié sur cette période.",
+    loadError: "Impossible de charger la répartition du temps par tâche."
+  }
+} as const;

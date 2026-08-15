@@ -1,3 +1,5 @@
+import type { TimeAllocationPeriod } from "./allocationPeriod";
+
 export type TimeAllocationRow = {
   id: string;
   name: string;
@@ -30,8 +32,13 @@ export type TimeAllocationMetrics = {
 
 export type TimeAllocationData = {
   date: string;
+  period: TimeAllocationPeriod;
+  rangeStart: string;
+  rangeEnd: string;
   weekId: string;
   dayBudgetMinutes: number;
+  periodBudgetMinutes: number;
+  maximumBudgetMinutes: number;
   targetWeightTotal: number;
   plannedMinutesTotal: number;
   plannedMinutesAutoTotal: number;
@@ -42,6 +49,18 @@ export type TimeAllocationData = {
   hasManualPlanOverrides: boolean;
   rows: TimeAllocationRow[];
   metrics: TimeAllocationMetrics;
+};
+
+export type CalendarAllocationPlan = {
+  id: string;
+  categoryId: string;
+  title: string;
+  color: string;
+  period: Exclude<TimeAllocationPeriod, "day">;
+  startDate: string;
+  endDate: string;
+  endExclusive: string;
+  plannedMinutes: number;
 };
 
 export type TimeAllocationDraft = {

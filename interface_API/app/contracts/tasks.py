@@ -28,6 +28,7 @@ class TaskItem(ApiRequest):
     estimated_minutes: int = Field(default=0, ge=0, le=10_080)
     completion_percent: int = Field(default=0, ge=0, le=100)
     status: TaskStatus = TaskStatus.PLANNED
+    not_done_reason: str | None = None
 
 
 class TaskCreateRequest(TaskItem):
@@ -62,6 +63,7 @@ class TaskCreateRequest(TaskItem):
                 estimatedMinutes=self.estimated_minutes,
                 completionPercent=self.completion_percent,
                 status=self.status,
+                notDoneReason=self.not_done_reason,
             )
         ]
 
@@ -83,6 +85,7 @@ class TaskUpdateRequest(ApiRequest):
     estimated_minutes: int | None = Field(default=None, ge=0, le=10_080)
     completion_percent: int | None = Field(default=None, ge=0, le=100)
     status: TaskStatus | None = None
+    not_done_reason: str | None = None
     sort_order: int | None = None
 
 

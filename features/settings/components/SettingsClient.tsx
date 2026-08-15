@@ -1,12 +1,17 @@
 "use client";
 
-import { KeyRound, Lock, Moon } from "lucide-react";
+import { KeyRound, Lock, Palette } from "lucide-react";
 import { useState } from "react";
 import { FieldLabel, Panel, SelectInput, TextInput } from "@/components/ui";
+import { AppearanceSettingsControl } from "@/features/interface/components/AppearanceControl";
+import { LocaleControl } from "@/features/interface/components/LocaleControl";
+import { useLocale } from "@/features/interface/localization/LocaleProvider";
 import { updateTrackingSettings } from "@/features/settings/api/settingsApi";
 import type { TrackingSettingsPatch } from "@/features/settings/domain/settings";
 import { ApiError } from "@/lib/http/apiClient";
 import { LogoutButton } from "./LogoutButton";
+
+type SaveState = "saved" | "saving" | "failed";
 
 export function SettingsClient({
   initialCalorieTarget,
@@ -17,13 +22,14 @@ export function SettingsClient({
   initialSleepDelay: number;
   usingDevAccessKey: boolean;
 }) {
+  const { translate } = useLocale();
   const [calorieTarget, setCalorieTarget] = useState(initialCalorieTarget);
   const [defaultSleepDelayMin, setDefaultSleepDelayMin] = useState(initialSleepDelay);
-  const [saved, setSaved] = useState("Saved");
+  const [saveState, setSaveState] = useState<SaveState>("saved");
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  async function save(patch: Partial<TrackingSettingsPatch>) {
-    setSaved("Saving...");
+  async function save(patch: Partial<TrackingSettingsPatch>): Promise<void> {
+    setSaveState("saving");
     setSaveError(null);
     let wasSaved = false;
     try {
@@ -36,9 +42,9 @@ export function SettingsClient({
       setDefaultSleepDelayMin(settings.defaultSleepDelayMin);
       wasSaved = true;
     } catch (error: unknown) {
-      setSaveError(readApiErrorMessage(error, "Unable to save tracking settings."));
+      setSaveError(readApiErrorMessage(error, translate("settings.saveError")));
     } finally {
-      setSaved(wasSaved ? "Saved" : "Save failed");
+      setSaveState(wasSaved ? "saved" : "failed");
     }
   }
 
@@ -47,10 +53,18 @@ export function SettingsClient({
       <Panel>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase text-accent">Defaults</p>
-            <h2 className="mt-1 text-lg font-semibold text-slate-50">Tracking settings</h2>
+            <p className="text-xs font-semibold uppercase text-accent">{translate("settings.defaults")}</p>
+            <h2 className="mt-1 text-lg font-semibold text-ink">{translate("settings.trackingTitle")}</h2>
           </div>
-          <span className="text-sm font-semibold text-slate-400">{saved}</span>
+          <span className="text-sm font-semibold text-muted">
+            {translate(
+              saveState === "saving"
+                ? "settings.saving"
+                : saveState === "failed"
+                  ? "settings.saveFailed"
+                  : "settings.saved"
+            )}
+          </span>
         </div>
         <div className="space-y-4">
           {saveError ? (
@@ -59,7 +73,7 @@ export function SettingsClient({
             </p>
           ) : null}
           <div>
-            <FieldLabel>Calorie target</FieldLabel>
+            <FieldLabel>{translate("settings.calorieTarget")}</FieldLabel>
             <TextInput
               type="number"
               value={calorieTarget}
@@ -69,7 +83,7 @@ export function SettingsClient({
             />
           </div>
           <div>
-            <FieldLabel>Default sleep delay</FieldLabel>
+            <FieldLabel>{translate("settings.sleepDelay")}</FieldLabel>
             <SelectInput
               value={defaultSleepDelayMin}
               onChange={(event) => {
@@ -81,7 +95,7 @@ export function SettingsClient({
             >
               {[10, 20, 30, 45, 60].map((minutes) => (
                 <option key={minutes} value={minutes}>
-                  {minutes} min
+                  {translate("settings.minutes", { minutes })}
                 </option>
               ))}
             </SelectInput>
@@ -95,17 +109,15 @@ export function SettingsClient({
             <KeyRound className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-semibold text-slate-50">Access key</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
-              Authentication uses a signed httpOnly cookie. Password rotation UI is a placeholder for now.
-            </p>
-            <div className="mt-4 flex items-center gap-2 rounded-md border border-line bg-shell px-3 py-2 text-sm text-slate-400">
+            <h2 className="text-lg font-semibold text-ink">{translate("settings.accessKey")}</h2>
+            <p className="mt-2 text-sm leading-6 text-muted">{translate("settings.accessDescription")}</p>
+            <div className="mt-4 flex items-center gap-2 rounded-2xl border border-line bg-shell px-3 py-2 text-sm text-muted">
               <Lock className="h-4 w-4" />
-              Access key configured in <code>.env</code>
+              {translate("settings.accessConfigured")}
             </div>
             {usingDevAccessKey ? (
               <p className="mt-3 rounded-md border border-warn/45 bg-warn/10 p-3 text-sm font-medium text-warn">
-                Development fallback key is active.
+                {translate("settings.devKeyWarning")}
               </p>
             ) : null}
           </div>
@@ -115,18 +127,22 @@ export function SettingsClient({
       <Panel>
         <div className="flex items-start gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-md bg-violet/15 text-violet">
-            <Moon className="h-5 w-5" />
+            <Palette className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-slate-50">Theme</h2>
-            <p className="mt-2 text-sm text-slate-400">Dark mode is locked for this MVP.</p>
+            <h2 className="text-lg font-semibold text-ink">{translate("settings.appearanceTitle")}</h2>
+            <p className="mt-2 text-sm leading-6 text-muted">{translate("settings.appearanceDescription")}</p>
+            <div className="mt-4 space-y-4">
+              <AppearanceSettingsControl />
+              <LocaleControl />
+            </div>
           </div>
         </div>
       </Panel>
 
       <Panel>
-        <h2 className="text-lg font-semibold text-slate-50">Session</h2>
-        <p className="mt-2 text-sm text-slate-400">Clear the signed cookie and return to the access-key screen.</p>
+        <h2 className="text-lg font-semibold text-ink">{translate("settings.session")}</h2>
+        <p className="mt-2 text-sm text-muted">{translate("settings.sessionDescription")}</p>
         <div className="mt-4">
           <LogoutButton />
         </div>
