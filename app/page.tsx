@@ -7,6 +7,7 @@ import { parseLifeTerminalData } from "@/features/life-terminal/api/lifeTerminal
 import { requireUser } from "@/lib/auth";
 import { formatDisplayDate } from "@/lib/dates";
 import { requestInternalApiJson } from "@/lib/server/internalApiClient";
+import { PerformanceStrip } from "@/features/performance/components/PerformanceStrip";
 
 export default async function HomePage() {
   await requireUser();
@@ -74,6 +75,7 @@ export default async function HomePage() {
         </div>
       </div>
 
+      <div className="mb-4"><PerformanceStrip /></div>
       <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
         <Panel>
           <p className="text-xs font-semibold uppercase text-accent">Current regime</p>

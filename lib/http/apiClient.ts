@@ -8,6 +8,14 @@ type ApiRequestOptions = RequestInit & {
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
+type ApiTransport = (url: string, options: RequestInit) => Promise<Response>;
+let apiTransport: ApiTransport = (url, options) => fetch(url, options);
+
+/** The Android entry point supplies its native HTTP transport; web keeps same-origin fetch. */
+export function configureApiTransport(transport: ApiTransport): void {
+  apiTransport = transport;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -32,7 +40,7 @@ export async function requestJson<T>(
   const timeout = setTimeout(() => requestController.abort("Request timed out"), timeoutMs);
 
   try {
-    const response = await fetch(url, {
+    const response = await apiTransport(url, {
       ...requestOptions,
       credentials: "include",
       headers: {

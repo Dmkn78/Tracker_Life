@@ -228,7 +228,7 @@ export function Drawer({
             <h3 className="text-xl font-semibold text-ink">{title}</h3>
             {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
           </div>
-          <GhostButton type="button" onClick={onClose} className="min-h-10 min-w-10 px-0">
+          <GhostButton type="button" aria-label="Close drawer" onClick={onClose} className="min-h-10 min-w-10 px-0">
             <X className="h-4 w-4" />
           </GhostButton>
         </div>

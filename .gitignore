@@ -12,3 +12,8 @@ interface_API/.venv
 __pycache__
 *.pyc
 tsconfig.tsbuildinfo
+mobile-dist/
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/

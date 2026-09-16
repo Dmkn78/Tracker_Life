@@ -7,7 +7,7 @@ from datetime import datetime, time
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from ..models import CalendarEvent, Objective, Task, WeeklyPlanBlock
+from ..models import CalendarEvent, Objective, ObjectivePlan, PerformanceWeek, Task, WeeklyPlanBlock
 from .dates import (
     add_days,
     day_full_label,
@@ -20,6 +20,8 @@ from .dates import (
     parse_date_key,
 )
 from .numbers import javascript_round
+from .objective_progress import rollup_progress
+from .performance import DEFAULT_WEEKLY_MINUTES
 
 PRIORITY_RANK = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
 HORIZON_RANK = {"YEAR": 1, "QUARTER": 2, "MONTH": 3, "WEEK": 4}
@@ -60,10 +62,10 @@ def serialize_task(task: Task, objective_title: str | None = None) -> dict:
     return {
         "id": task.id,
         "title": task.title,
-        "date": task.date.isoformat(),
+        "date": task.date.isoformat() if task.date else None,
         "status": task.status.lower(),
         "importance": task.importance.lower(),
-        "completionPercent": task.completionPercent,
+        "completionPercent": 100 if task.status == "DONE" else task.completionPercent,
         "estimatedMinutes": task.estimatedMinutes,
         "objectiveId": task.objectiveId,
         "objectiveTitle": objective_title,
@@ -79,6 +81,8 @@ def serialize_block(block: WeeklyPlanBlock, objective: Objective | None = None) 
         "startTime": block.startTime,
         "endTime": block.endTime,
         "durationMinutes": block.durationMinutes,
+        "actualMinutes": block.actualMinutes,
+        "executionStatus": block.executionStatus,
         "flexible": block.flexible,
         "note": block.note,
         "objectiveId": block.objectiveId,
@@ -137,8 +141,6 @@ def get_objectives_data(db: Session, user_id: str, week_id: str | None = None) -
     week_id = week_id or get_iso_week_id()
     week_days = get_week_date_keys(week_id)
     week_start, week_end = week_days[0], week_days[6]
-    task_from = add_days(week_start, -14)
-    task_to = add_days(week_end, 30)
 
     objectives = list(
         db.execute(
@@ -152,8 +154,6 @@ def get_objectives_data(db: Session, user_id: str, week_id: str | None = None) -
             select(Task)
             .where(
                 Task.userId == user_id,
-                Task.date >= parse_date_key(task_from),
-                Task.date <= parse_date_key(task_to),
             )
             .order_by(Task.date.asc(), Task.importance.desc(), Task.createdAt.asc())
         ).scalars()
@@ -182,6 +182,10 @@ def get_objectives_data(db: Session, user_id: str, week_id: str | None = None) -
     )
 
     objective_map = {objective.id: objective for objective in objectives}
+    plans = {plan.objectiveId: plan for plan in db.scalars(select(ObjectivePlan).where(ObjectivePlan.objectiveId.in_(objective_map)))}
+    progress = rollup_progress(objectives, tasks, plans)
+    performance_week = db.get(PerformanceWeek, (user_id, parse_date_key(week_start)))
+    focus_target = performance_week.targetMinutes if performance_week else DEFAULT_WEEKLY_MINUTES
     task_options = [
         serialize_task(
             task,
@@ -224,14 +228,7 @@ def get_objectives_data(db: Session, user_id: str, week_id: str | None = None) -
         ]
         linked_tasks = tasks_by_objective.get(objective.id, [])
         planned_blocks = blocks_by_objective.get(objective.id, [])
-        if objective.status == "DONE":
-            completion = 100
-        elif linked_tasks:
-            completion = javascript_round(
-                sum(task["completionPercent"] for task in linked_tasks) / len(linked_tasks)
-            )
-        else:
-            completion = 0
+        completion = progress[objective.id]
         return {
             **serialize_objective(objective),
             "completionPercent": completion,
@@ -244,7 +241,7 @@ def get_objectives_data(db: Session, user_id: str, week_id: str | None = None) -
 
     tree = [
         node
-        for objective in sorted(children_by_parent.get(None, []), key=_objective_sort_key)
+        for objective in sorted((item for item in objectives if item.parentId not in objective_map), key=_objective_sort_key)
         if (node := build_node(objective.id)) is not None
     ]
 
@@ -385,6 +382,8 @@ def get_objectives_data(db: Session, user_id: str, week_id: str | None = None) -
             "linkedTasks": len([task for task in task_options if task["objectiveId"]]),
         },
         "weekSummary": {
+            "focusTargetMinutes": focus_target,
+            "plannedFocusMinutes": sum(block.durationMinutes for block in block_rows if block.category in ("WORK", "STUDY")),
             "totalMinutes": total_weekly_minutes,
             "totalMinutesLabel": format_minutes(total_weekly_minutes),
             "busiestDay": with_date_label(busiest_day),

@@ -1,5 +1,7 @@
 # CI/CD vers une VM Windows avec IIS
 
+> **Document historique, non actif.** La production confirmée utilise un VPS Ubuntu. Le workflow IIS a été retiré : il ciblait un export statique incompatible avec l’application actuelle et aucun runner IIS n’était configuré. Le circuit actuel est décrit dans [production-git.md](production-git.md). Les instructions et le script IIS ci-dessous restent des références pour une éventuelle migration future.
+
 ## État de compatibilité du dépôt
 
 Le pipeline livré dans `.github/workflows/deploy.yml` est volontairement **fail-closed** : il ne déploie que si le projet produit un export statique Next.js dans `out/`.

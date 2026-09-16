@@ -9,9 +9,9 @@ Le projet est organisé en quatre processus ou services :
 - le service local Whisper sur le port `8001` ;
 - PostgreSQL sur le port `5432`.
 
-## CI/CD Windows / IIS
+## GitHub et production Ubuntu
 
-Le pipeline GitHub Actions destiné à une VM Windows/IIS et son runbook sont décrits dans [`docs/ci-cd-windows-iis.md`](docs/ci-cd-windows-iis.md). La cible IIS statique exige que l'interface soit d'abord migrée vers un export Next.js réellement compatible avec `out/`; le code actuel utilise encore le rendu serveur, les cookies, Prisma et des routes API.
+La production utilise un VPS Ubuntu. Les modifications passent de `dev_branch` vers `main` par une pull request. Le workflow [`ci.yml`](.github/workflows/ci.yml) vérifie TypeScript, les tests JavaScript et PostgreSQL, les builds web/mobile et la synchronisation Capacitor. Il ne déploie pas sur le VPS. Voir le [circuit Git et production](docs/production-git.md).
 
 FastAPI est la source unique de logique métier. Next.js rend l’interface, gère le cookie de session du navigateur et expose des proxies same-origin très minces. Prisma possède le schéma et les migrations PostgreSQL ; SQLAlchemy permet à FastAPI d’utiliser ce même schéma.
 
@@ -23,6 +23,8 @@ La documentation complète se trouve dans [`docs/README.md`](docs/README.md).
 - Notions de programmation : [`docs/02-FONDAMENTAUX-DU-CODE.md`](docs/02-FONDAMENTAUX-DU-CODE.md)
 - Architecture : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Guide de maintenance : [`docs/08-MAINTENANCE-ET-REGLES.md`](docs/08-MAINTENANCE-ET-REGLES.md)
+- Performance, capital fictif et rewards : [`docs/performance-mvp.md`](docs/performance-mvp.md)
+- Objectifs, roadmap, exécution, prévisions et mode crème : [`docs/objectives-planning.md`](docs/objectives-planning.md)
 
 ## Démarrage local rapide sous Windows
 
@@ -579,4 +581,14 @@ Si tu changes une variable d’environnement, redémarre les services :
 
 ```bash
 systemctl restart life-api life-whisper life-web
+```
+
+## Android — Life Regime
+
+Version Capacitor avec les composants existants, un entonnoir de tâches et une saisie rapide depuis les notifications. Voir [le guide Android](docs/android.md) pour le serveur, le build et l’installation personnelle de l’APK.
+
+```powershell
+npm run build
+npx cap sync android
+npx cap open android
 ```

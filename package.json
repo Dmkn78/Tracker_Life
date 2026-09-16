@@ -9,10 +9,10 @@
   "scripts": {
     "dev": "next dev",
     "start": "next start",
-    "build": "next build",
+    "build": "npm run build:web && npm run build:mobile",
     "typecheck": "tsc --noEmit",
     "test:appearance": "node --experimental-strip-types --test features/interface/domain/appearance.test.mjs",
-    "test:todo": "node --experimental-strip-types --test features/todo/domain/todoTask.test.mjs",
+    "test:todo": "node --experimental-strip-types --test features/todo/domain/todoTask.test.mjs features/todo/domain/todoPlanning.test.mjs",
     "test:habits": "node --experimental-strip-types --test features/habits/domain/habitSchedule.test.mjs",
     "test:daily-log": "node --experimental-strip-types --test features/daily-log/domain/workRatio.test.mjs",
     "test:emotional": "node --experimental-strip-types --test features/emotional/domain/emotionalReview.test.mjs",
@@ -21,7 +21,16 @@
     "test:api": "scripts\\test-api.cmd",
     "check": "pnpm typecheck && pnpm test:appearance && pnpm test:todo && pnpm test:habits && pnpm test:daily-log && pnpm test:emotional && pnpm test:calendar && pnpm test:time-allocation && pnpm test:api && pnpm build",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "build:web": "next build --webpack",
+    "build:mobile": "vite build --config mobile/vite.config.ts",
+    "dev:mobile": "vite --config mobile/vite.config.ts",
+    "preview:mobile": "vite preview --config mobile/vite.config.ts",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android",
+    "android:apk": "node scripts/build-android-apk.mjs",
+    "capacitor:sync:after": "node scripts/sync-android-custom.mjs",
+    "test:mobile": "node --experimental-strip-types --test mobile/*.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -38,7 +47,10 @@
     "next-themes": "^0.4.6",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "recharts": "3.8.1"
+    "recharts": "3.8.1",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/android": "8.5.2",
+    "@capacitor/app": "8.1.1"
   },
   "devDependencies": {
     "@types/node": "25.9.3",
@@ -48,6 +60,8 @@
     "postcss": "8.5.15",
     "prisma": "6.19.3",
     "tailwindcss": "3.4.19",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "@capacitor/cli": "8.5.2",
+    "vite": "7.3.1"
   }
 }

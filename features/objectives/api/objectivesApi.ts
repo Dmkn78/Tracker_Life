@@ -198,12 +198,12 @@ function parseObjectiveSummary(payload: unknown, context: string): ObjectiveSumm
   };
 }
 
-function parseObjectiveTask(payload: unknown, context: string): ObjectiveTask {
+export function parseObjectiveTask(payload: unknown, context: string): ObjectiveTask {
   const task = expectJsonObject(payload, context);
   return {
     id: expectString(task.id, `${context}.id`),
     title: expectString(task.title, `${context}.title`),
-    date: expectString(task.date, `${context}.date`),
+    date: expectNullableString(task.date, `${context}.date`),
     status: expectLiteral(task.status, TASK_STATUSES, `${context}.status`),
     importance: expectLiteral(task.importance, TASK_IMPORTANCE_LEVELS, `${context}.importance`),
     completionPercent: expectNumber(task.completionPercent, `${context}.completionPercent`),
@@ -213,7 +213,7 @@ function parseObjectiveTask(payload: unknown, context: string): ObjectiveTask {
   };
 }
 
-function parseWeeklyPlanBlock(payload: unknown, context: string): WeeklyPlanBlock {
+export function parseWeeklyPlanBlock(payload: unknown, context: string): WeeklyPlanBlock {
   const block = expectJsonObject(payload, context);
   return {
     id: expectString(block.id, `${context}.id`),
@@ -223,6 +223,8 @@ function parseWeeklyPlanBlock(payload: unknown, context: string): WeeklyPlanBloc
     startTime: expectNullableString(block.startTime, `${context}.startTime`),
     endTime: expectNullableString(block.endTime, `${context}.endTime`),
     durationMinutes: expectNumber(block.durationMinutes, `${context}.durationMinutes`),
+    actualMinutes: block.actualMinutes === null ? null : expectNumber(block.actualMinutes, `${context}.actualMinutes`),
+    executionStatus: expectLiteral(block.executionStatus, ["planned", "done", "partial", "not_done"] as const, `${context}.executionStatus`),
     flexible: expectBoolean(block.flexible, `${context}.flexible`),
     note: expectNullableString(block.note, `${context}.note`),
     objectiveId: expectNullableString(block.objectiveId, `${context}.objectiveId`),
@@ -349,6 +351,8 @@ function parseObjectiveWeekSummary(
 ): ObjectiveWeekSummary {
   const summary = expectJsonObject(payload, context);
   return {
+    focusTargetMinutes: expectNumber(summary.focusTargetMinutes, `${context}.focusTargetMinutes`),
+    plannedFocusMinutes: expectNumber(summary.plannedFocusMinutes, `${context}.plannedFocusMinutes`),
     totalMinutes: expectNumber(summary.totalMinutes, `${context}.totalMinutes`),
     totalMinutesLabel: expectString(summary.totalMinutesLabel, `${context}.totalMinutesLabel`),
     busiestDay: parseNullableNamedDayLoad(summary.busiestDay, `${context}.busiestDay`),

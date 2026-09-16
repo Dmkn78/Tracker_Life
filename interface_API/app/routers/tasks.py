@@ -2,13 +2,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, delete, select
 from sqlalchemy.orm import Session
 
-from ..contracts.tasks import TaskCreateRequest, TaskReorderRequest, TaskUpdateRequest
+from ..contracts.tasks import TaskCreateRequest, TaskReorderRequest, TaskUpdateRequest, TaskItem
+from ..contracts.task_capture import TaskCaptureRequest
+from ..contracts.task_execution import TaskExecutionRequest
 from ..core.tags_companies import resolve_company_id, resolve_tag_ids, set_task_tags
 from ..database import get_db
-from ..models import Company, Objective, Tag, Task, TaskTag, ThinkingNoteTask, User
+from ..models import Company, Objective, Tag, Task, TaskCapture, TaskTag, ThinkingNoteTask, User, WeeklyPlanBlock
 from ..security import get_current_user
 from ..core.dates import add_days, iso_datetime, parse_date_key, to_date_key
 from ..core.scoring import recompute_around_date
+from ..core.completion import record_completion
+from ..core.objective_progress import record_objective_progress
+from ..core.performance_work import recorded_day_minutes
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -48,6 +53,7 @@ def serialize_task(
     objective_title: str | None = None,
     tags: list[dict] | None = None,
     company: Company | None = None,
+    work_sessions: list[WeeklyPlanBlock] | None = None,
 ) -> dict | None:
     if task is None:
         return None
@@ -69,6 +75,7 @@ def serialize_task(
         "status": task.status.lower(),
         "notDoneReason": task.notDoneReason,
         "sortOrder": task.sortOrder,
+        "workSessions": [{"id": block.id, "date": block.date.isoformat(), "actualMinutes": block.actualMinutes, "executionStatus": block.executionStatus} for block in (work_sessions or [])],
         "objectiveId": task.objectiveId,
         "objectiveTitle": objective_title if objective_title is not None else _objective_title(db, task.objectiveId),
         "companyId": task.companyId,
@@ -116,6 +123,9 @@ def list_tasks(
         ).all()
     )
     task_ids = [task.id for task, _ in task_rows]
+    work_by_task: dict[str, list[WeeklyPlanBlock]] = {}
+    for block in db.scalars(select(WeeklyPlanBlock).where(WeeklyPlanBlock.userId == user.id, WeeklyPlanBlock.taskId.in_(task_ids)).order_by(WeeklyPlanBlock.date)):
+        work_by_task.setdefault(block.taskId, []).append(block)
     tags_by_task = _tags_by_task_id(db, task_ids)
     company_ids = {task.companyId for task, _ in task_rows if task.companyId}
     companies_by_id = {
@@ -130,6 +140,7 @@ def list_tasks(
                 objective_title,
                 tags_by_task.get(task.id, []),
                 companies_by_id.get(task.companyId) if task.companyId else None,
+                work_by_task.get(task.id, []),
             )
             for task, objective_title in task_rows
         ]
@@ -156,6 +167,7 @@ def _create_one_task(db: Session, user: User, item) -> Task:
         status=item.status.value,
         notDoneReason=item.not_done_reason if item.status.value == "NOT_DONE" else None,
     )
+    record_completion(task, None)
     db.add(task)
     db.flush()
     if tag_ids:
@@ -175,6 +187,7 @@ def create_tasks(
     for date_key in {task.date.isoformat() for task in tasks if task.date}:
         recompute_around_date(db, user.id, date_key)
     serialized = [serialize_task(db, task) for task in tasks]
+    record_objective_progress(db, user.id)
     return {"task": serialized[0] if serialized else None, "tasks": serialized}
 
 
@@ -190,6 +203,7 @@ def update_task(
     if existing is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    previous_status = existing.status
     provided_fields = body.model_fields_set
     if body.title is not None:
         existing.title = body.title
@@ -227,10 +241,66 @@ def update_task(
         existing.notDoneReason = None
     if body.sort_order is not None:
         existing.sortOrder = body.sort_order
+    record_completion(existing, previous_status)
     db.flush()
+    record_objective_progress(db, user.id)
     if existing.date:
         recompute_around_date(db, user.id, existing.date.isoformat())
-    return {"task": serialize_task(db, existing)}
+    sessions = list(db.scalars(select(WeeklyPlanBlock).where(WeeklyPlanBlock.taskId == existing.id, WeeklyPlanBlock.userId == user.id)))
+    return {"task": serialize_task(db, existing, work_sessions=sessions)}
+
+
+@router.post("/execution")
+def log_task_execution(body: TaskExecutionRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    db.execute(select(User.id).where(User.id == user.id).with_for_update()).scalar_one()
+    task = db.scalar(select(Task).where(Task.id == body.task_id, Task.userId == user.id))
+    if task is None:
+        raise HTTPException(404, "Task not found")
+    if task.status == "CANCELLED":
+        raise HTTPException(400, "Restore the task before logging execution")
+    block = db.scalar(select(WeeklyPlanBlock).where(WeeklyPlanBlock.taskId == task.id, WeeklyPlanBlock.date == body.date))
+    if recorded_day_minutes(db, user.id, body.date, block.id if block else None) + (body.actual_minutes or 0) > 1440:
+        raise HTTPException(400, "Recorded work cannot exceed 24 hours in one day")
+    if block is None:
+        block = WeeklyPlanBlock(userId=user.id, taskId=task.id, date=body.date, durationMinutes=0, flexible=True)
+        db.add(block)
+    block.title = task.title
+    block.objectiveId = task.objectiveId
+    block.category = "WORK" if task.productive else "PERSONAL"
+    block.executionStatus = body.result
+    block.actualMinutes = body.actual_minutes
+    previous_status = task.status
+    task.status = {"done": "DONE", "partial": "IN_PROGRESS", "not_done": "NOT_DONE"}[body.result]
+    if body.result != "not_done":
+        task.notDoneReason = None
+    if body.result == "done":
+        task.completionPercent = 100
+    elif body.result == "partial":
+        task.completionPercent = task.completionPercent if 0 < task.completionPercent < 100 else 50
+    else:
+        task.completionPercent = 0
+    record_completion(task, previous_status)
+    record_objective_progress(db, user.id)
+    if task.date:
+        recompute_around_date(db, user.id, task.date.isoformat())
+    sessions = list(db.scalars(select(WeeklyPlanBlock).where(WeeklyPlanBlock.taskId == task.id, WeeklyPlanBlock.userId == user.id)))
+    return {"task": serialize_task(db, task, work_sessions=sessions)}
+
+
+@router.post("/capture")
+def capture_task(body: TaskCaptureRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    db.execute(select(User.id).where(User.id == user.id).with_for_update()).scalar_one()
+    request_id = str(body.request_id)
+    receipt = db.get(TaskCapture, request_id)
+    if receipt:
+        if receipt.userId != user.id or receipt.title != body.title:
+            raise HTTPException(409, "Capture identifier already used")
+        # A delayed phone retry must not resurrect a deleted task.
+        return {"captureId": request_id, "taskId": receipt.taskId, "deleted": receipt.taskId is None}
+    task = _create_one_task(db, user, TaskItem(title=body.title))
+    db.add(TaskCapture(id=request_id, userId=user.id, taskId=task.id, title=body.title))
+    db.flush()
+    return {"captureId": request_id, "taskId": task.id, "deleted": False}
 
 
 @router.patch("/reorder")
@@ -271,4 +341,5 @@ def delete_task(
     db.execute(delete(ThinkingNoteTask).where(ThinkingNoteTask.taskId == existing.id))
     db.delete(existing)
     db.flush()
+    record_objective_progress(db, user.id)
     return {"ok": True}

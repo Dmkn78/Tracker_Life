@@ -12,10 +12,11 @@ export const TODO_STATUSES = [
 
 export type TodoImportance = (typeof TODO_IMPORTANCE_LEVELS)[number];
 export type TodoStatus = (typeof TODO_STATUSES)[number];
-export type TodoScope = "today" | "tomorrow" | "week" | "all";
+export type TodoScope = "today" | "tomorrow" | "week" | "month" | "all";
 export type TodoDescriptionChoice = "yes" | "no";
 
 export type TodoTask = {
+  workSessions?: { id: string; date: string; actualMinutes: number | null; executionStatus: string }[];
   id: string;
   title: string;
   description: string | null;
@@ -65,6 +66,7 @@ export type ObjectiveOption = {
   id: string;
   title: string;
   horizon: string;
+  color?: string;
 };
 
 export type TodoTaskWriteValues = {

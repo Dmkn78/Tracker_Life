@@ -1,8 +1,9 @@
 """Life Regime Tracker standalone API application."""
 
 import logging
+from importlib.util import find_spec
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -18,14 +19,17 @@ from .routers import (
     history,
     life_terminal,
     objectives,
+    objective_planning,
+    performance,
     reports,
     settings as settings_router,
     tags,
     tasks,
     thinking_notes,
     time_allocation,
-    transcribe,
 )
+from .models import User
+from .security import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +84,7 @@ def health() -> dict[str, bool]:
 
 
 app.include_router(auth.router)
+app.include_router(objective_planning.router)
 app.include_router(daily_log.router)
 app.include_router(emotional_reviews.router)
 app.include_router(tasks.router)
@@ -87,10 +92,17 @@ app.include_router(calendar_events.router)
 app.include_router(habits.router)
 app.include_router(history.router)
 app.include_router(objectives.router)
+app.include_router(performance.router)
 app.include_router(settings_router.router)
 app.include_router(time_allocation.router)
 app.include_router(reports.router)
-app.include_router(transcribe.router)
+if find_spec(f"{__package__}.routers.transcribe") is not None:
+    from .routers import transcribe
+    app.include_router(transcribe.router)
+else:
+    @app.post("/api/transcribe")
+    def unavailable_transcription(user: User = Depends(get_current_user)):
+        raise HTTPException(status_code=503, detail="Transcription module is not installed")
 app.include_router(life_terminal.router)
 app.include_router(companies.router)
 app.include_router(tags.router)

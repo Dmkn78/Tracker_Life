@@ -7,6 +7,7 @@ function withOpacity(cssVariable: string) {
 
 const config: Config = {
   content: [
+    "./mobile/**/*.{html,ts,tsx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./features/**/*.{js,ts,jsx,tsx,mdx}",

@@ -68,6 +68,13 @@ import {
   shiftWeekId
 } from "@/lib/dates";
 import { ApiError } from "@/lib/http/apiClient";
+import { PerformanceStrip } from "@/features/performance/components/PerformanceStrip";
+import { TodoWeeklyCalendar, TodoMonthlyRoadmap, TodoExecutionInsights } from "./TodoPlanningViews";
+import { TaskFunnel } from "./TaskFunnel";
+import { TodoExecutionDrawer } from "./TodoExecutionDrawer";
+import { TodoObjectiveTrajectory } from "./TodoObjectiveTrajectory";
+import { monthRange, summarizeTasks, taskSlot } from "../domain/todoPlanning";
+import { logTodoExecution } from "../api/todoApi";
 
 type DrawerState =
   | { kind: "edit"; id: string; draft: TodoTaskFields }
@@ -82,6 +89,7 @@ const SCOPE_LABEL_KEYS: Record<TodoScope, TranslationKey> = {
   today: "todo.scope.today",
   tomorrow: "todo.scope.tomorrow",
   week: "todo.scope.week",
+  month: "todo.scope.month",
   all: "todo.scope.all"
 };
 const IMPORTANCE_LABEL_KEYS: Record<TodoImportance, TranslationKey> = {
@@ -104,11 +112,18 @@ function newRow(date: string): TodoTaskRow {
   return { ...emptyTodoTaskFields(date), key: `row-${rowKeySeed}`, enabled: true };
 }
 
-export function TodoClient({ today }: { today: string }) {
+export function TodoClient({ today, initialView = "list" }: { today: string; initialView?: "list" | "funnel" }) {
   const { locale, translate } = useLocale();
   const [date, setDate] = useState(today);
-  const [scope, setScope] = useState<TodoScope>("today");
+  const [scope, setScope] = useState<TodoScope>(initialView === "funnel" ? "all" : "today");
   const [weekId, setWeekId] = useState(() => getIsoWeekId(today));
+  const [month, setMonth] = useState(today.slice(0, 7));
+  const [view, setView] = useState<"list" | "weekly" | "monthly" | "insights" | "funnel">(initialView);
+  const [search, setSearch] = useState("");
+  const [objectiveFilter, setObjectiveFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [executionTask, setExecutionTask] = useState<TodoTask | null>(null);
+  const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<TodoTask[]>([]);
   const [objectiveOptions, setObjectiveOptions] = useState<ObjectiveOption[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -149,7 +164,9 @@ export function TodoClient({ today }: { today: string }) {
   useEffect(() => {
     const requestController = new AbortController();
     const weekDays = getWeekDateKeys(weekId);
-    const tasksRequest = scope === "week"
+    const tasksRequest = scope === "month"
+      ? listTodoTasksInRange({ from: monthRange(month).start, to: monthRange(month).end, signal: requestController.signal })
+      : scope === "week"
       ? listTodoTasksInRange({
           from: weekDays[0],
           to: weekDays[weekDays.length - 1],
@@ -157,8 +174,10 @@ export function TodoClient({ today }: { today: string }) {
         })
       : listTodoTasks({ date, scope, signal: requestController.signal });
     setPageError(null);
+    setLoading(true);
     void tasksRequest
       .then((loadedTasks) => {
+        if (requestController.signal.aborted) return;
         const synchronizedTasks = loadedTasks.map((task) =>
           taskWriteCoordinatorRef.current!.synchronizeConfirmedState(task.id, task)
         );
@@ -172,9 +191,9 @@ export function TodoClient({ today }: { today: string }) {
         if (!requestController.signal.aborted) {
           setPageError(readApiErrorMessage(error, translate("todo.loadError")));
         }
-      });
+      }).finally(() => { if (!requestController.signal.aborted) setLoading(false); });
     return () => requestController.abort();
-  }, [date, scope, translate, weekId]);
+  }, [date, month, scope, translate, weekId]);
 
   useEffect(() => {
     const requestController = new AbortController();
@@ -200,17 +219,23 @@ export function TodoClient({ today }: { today: string }) {
     if (nextScope === "today") setDate(today);
     if (nextScope === "tomorrow") setDate(addDays(today, 1));
     if (nextScope === "week") setWeekId(getIsoWeekId(date));
+    if (nextScope === "month") setMonth(date.slice(0, 7));
+    if (view === "funnel" && nextScope !== "all") setView("list");
+    if (view === "weekly" && nextScope !== "week") setView("list");
+    if (view === "monthly" && nextScope !== "month") setView("list");
   }
 
-  function openCreate() {
+  function openCreate(slotDate?: string, startTime?: string, objectiveId?: string) {
+    const creationDate = slotDate ?? (scope === "month" ? `${month}-01` : getCreationDate(scope, date, weekId));
+    const linkedObjectiveId = objectiveId ?? (objectiveFilter === "all" || objectiveFilter === "unassigned" ? "" : objectiveFilter);
     setDrawerError(null);
     setDrawer({
       kind: "create",
       createMode: "single",
-      single: emptyTodoTaskFields(getCreationDate(scope, date, weekId)),
+      single: { ...emptyTodoTaskFields(creationDate), ...(startTime ? taskSlot(creationDate, startTime) : {}), objectiveId: linkedObjectiveId },
       rows: [
-        newRow(getCreationDate(scope, date, weekId)),
-        newRow(getCreationDate(scope, date, weekId))
+        { ...newRow(creationDate), objectiveId: linkedObjectiveId },
+        { ...newRow(creationDate), objectiveId: linkedObjectiveId }
       ]
     });
   }
@@ -276,23 +301,39 @@ export function TodoClient({ today }: { today: string }) {
     }
   }
 
-  function patchTask(id: string, patch: TaskWritePayload): void {
+  async function patchTask(id: string, patch: TaskWritePayload): Promise<boolean> {
     const task = tasks.find((candidate) => candidate.id === id);
-    if (!task) return;
+    if (!task) return false;
     taskWriteCoordinatorRef.current!.synchronizeConfirmedState(id, task);
     setPageError(null);
-    void taskWriteCoordinatorRef.current!.enqueueWrite(id, patch).catch((error: unknown) => {
+    try {
+      await taskWriteCoordinatorRef.current!.enqueueWrite(id, patch);
+      window.dispatchEvent(new Event("performance-updated"));
+      return true;
+    } catch (error: unknown) {
       setPageError(readApiErrorMessage(error, translate("todo.updateError")));
-    });
+      return false;
+    }
+  }
+
+  async function saveExecution(payload: Parameters<typeof logTodoExecution>[0]): Promise<void> {
+    await taskWriteCoordinatorRef.current!.whenIdle(payload.taskId);
+    const savedTask = await logTodoExecution(payload);
+    const projected = taskWriteCoordinatorRef.current!.synchronizeConfirmedState(savedTask.id, savedTask);
+    setTasks((current) => current.map((task) => task.id === savedTask.id ? projected : task));
+    window.dispatchEvent(new Event("performance-updated"));
   }
 
   function reorderTasks(orderedIds: string[]): void {
+    const reorderedSet = new Set(orderedIds);
+    let nextIndex = 0;
+    const mergedOrder = tasks.map((task) => reorderedSet.has(task.id) ? orderedIds[nextIndex++] : task.id);
     reorderWriteCoordinatorRef.current!.synchronizeConfirmedState(
       REORDER_CHANNEL,
       tasks.map((task) => task.id)
     );
     setPageError(null);
-    void reorderWriteCoordinatorRef.current!.enqueueWrite(REORDER_CHANNEL, orderedIds).catch(
+    void reorderWriteCoordinatorRef.current!.enqueueWrite(REORDER_CHANNEL, mergedOrder).catch(
       (error: unknown) => {
         setPageError(readApiErrorMessage(error, translate("todo.reorderError")));
       }
@@ -312,23 +353,23 @@ export function TodoClient({ today }: { today: string }) {
     }
   }
 
-  const completed = tasks.filter((task) => task.status === "done" || task.completionPercent >= 100).length;
-  const averageDone = tasks.length === 0 ? 0 : Math.round(tasks.reduce((sum, task) => sum + task.completionPercent, 0) / tasks.length);
-  const totalEstimatedMinutes = tasks.reduce((sum, task) => sum + (task.estimatedMinutes ?? 0), 0);
+  const filteredTasks = tasks.filter((task) => (!search || `${task.title} ${task.description ?? ""} ${task.objectiveTitle ?? ""}`.toLowerCase().includes(search.toLowerCase())) && (objectiveFilter === "all" || (objectiveFilter === "unassigned" ? !task.objectiveId : task.objectiveId === objectiveFilter)) && (statusFilter === "all" || task.status === statusFilter));
+  const summary = summarizeTasks(filteredTasks, today);
+  const fr = locale === "fr";
 
   return (
     <div className="space-y-6">
       <SectionHeader
         eyebrow={scope === "all"
           ? translate("todo.allTasks")
-          : scope === "week"
+          : scope === "month" ? month : scope === "week"
             ? formatWeekRange(weekId, locale)
             : formatDisplayDate(date, locale)}
         title={translate("todo.title")}
         detail={translate("todo.detail")}
         action={
           <div className="flex flex-wrap gap-2">
-            <PrimaryButton onClick={openCreate}>
+            <PrimaryButton onClick={() => openCreate()}>
               <Plus className="h-4 w-4" />
               {translate("todo.add")}
             </PrimaryButton>
@@ -338,7 +379,7 @@ export function TodoClient({ today }: { today: string }) {
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <Segmented aria-label={translate("todo.scopeOptions")} className="w-full lg:w-auto">
-          {(["today", "tomorrow", "week", "all"] as const).map((item) => (
+          {(["today", "tomorrow", "week", "month", "all"] as const).map((item) => (
             <SegmentedButton key={item} active={scope === item} onClick={() => changeScope(item)}>
               {translate(SCOPE_LABEL_KEYS[item])}
             </SegmentedButton>
@@ -364,23 +405,27 @@ export function TodoClient({ today }: { today: string }) {
               <ChevronRight className="h-4 w-4" />
             </SecondaryButton>
           </div>
-        ) : scope !== "all" ? (
+        ) : scope === "month" ? <div className="flex w-full items-center gap-2 lg:w-auto">
+          <SecondaryButton aria-label={fr ? "Mois précédent" : "Previous month"} className="px-3" onClick={() => setMonth((current) => addDays(`${current}-01`, -1).slice(0, 7))}><ChevronLeft className="h-4 w-4" /></SecondaryButton>
+          <TextInput aria-label={fr ? "Mois affiché" : "Displayed month"} type="month" value={month} onChange={(event) => { if (event.target.value) setMonth(event.target.value); }} className="min-w-0 flex-1 lg:w-auto" />
+          <SecondaryButton aria-label={fr ? "Mois suivant" : "Next month"} className="px-3" onClick={() => setMonth((current) => addDays(monthRange(current).end, 1).slice(0, 7))}><ChevronRight className="h-4 w-4" /></SecondaryButton>
+        </div> : scope !== "all" ? (
           <TextInput
             type="date"
             value={date}
-            onChange={(event) => setDate(event.target.value)}
+            onChange={(event) => { if (event.target.value) setDate(event.target.value); }}
             className="w-full sm:w-auto sm:min-w-[170px]"
           />
         ) : null}
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <Metric label={translate("todo.tasks")} value={String(tasks.length)} />
-        <Metric label={translate("todo.done")} value={`${completed}/${tasks.length || 0}`} tone={completed > 0 ? "good" : "neutral"} />
+        <Metric label={translate("todo.tasks")} value={String(filteredTasks.length)} />
+        <Metric label={translate("todo.done")} value={`${summary.completed}/${summary.total}`} tone={summary.completed > 0 ? "good" : "neutral"} />
         <Metric
           label={translate("todo.plannedTime")}
-          value={formatMinutes(totalEstimatedMinutes)}
-          detail={translate("todo.averageDone", { percent: averageDone })}
+          value={formatMinutes(summary.plannedMinutes)}
+          detail={translate("todo.averageDone", { percent: summary.progress })}
         />
       </div>
 
@@ -390,9 +435,19 @@ export function TodoClient({ today }: { today: string }) {
         </p>
       ) : null}
 
-      <SoftPanel className="p-3">
-        <TodoList tasks={tasks} onPatch={patchTask} onEdit={openEdit} onAdd={openCreate} onDelete={deleteTask} onReorder={reorderTasks} />
-      </SoftPanel>
+      <div className="space-y-3">
+        <Segmented aria-label={fr ? "Présentation des tâches" : "Task presentation"}>{(["list", "funnel", "weekly", "monthly", "insights"] as const).map((mode) => <SegmentedButton key={mode} active={view === mode} onClick={() => { setView(mode); if (mode === "funnel") setScope("all"); if (mode === "weekly") setScope("week"); if (mode === "monthly") setScope("month"); }}>{({ funnel: fr ? "Entonnoir" : "Task funnel", list: fr ? "Liste" : "List", weekly: fr ? "Planning semaine" : "Weekly planning", monthly: fr ? "Roadmap mois" : "Monthly roadmap", insights: fr ? "Exécution & bilan" : "Execution & insights" })[mode]}</SegmentedButton>)}</Segmented>
+        <div className="grid gap-3 sm:grid-cols-3"><TextInput aria-label={fr ? "Rechercher une tâche" : "Find a task"} placeholder={fr ? "Rechercher une tâche…" : "Find a task…"} value={search} onChange={(event) => setSearch(event.target.value)} /><SelectInput aria-label={fr ? "Filtrer par objectif" : "Filter by objective"} value={objectiveFilter} onChange={(event) => setObjectiveFilter(event.target.value)}><option value="all">{fr ? "Tous les objectifs" : "All objectives"}</option><option value="unassigned">{fr ? "Sans objectif" : "Unassigned"}</option>{objectiveOptions.map((objective) => <option key={objective.id} value={objective.id}>{objective.title} · {objective.horizon}</option>)}</SelectInput><SelectInput aria-label={fr ? "Filtrer par statut" : "Filter by status"} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{fr ? "Tous les statuts" : "All statuses"}</option>{TODO_STATUSES.map((status) => <option key={status} value={status}>{translate(STATUS_LABEL_KEYS[status])}</option>)}</SelectInput></div>
+      </div>
+      {loading ? <SoftPanel><p role="status" className="text-sm text-muted">{fr ? "Chargement des tâches…" : "Loading tasks…"}</p></SoftPanel> : <>
+        {view === "list" ? <SoftPanel className="p-3"><TodoList tasks={filteredTasks} onPatch={patchTask} onEdit={openEdit} onAdd={() => openCreate()} onDelete={deleteTask} onReorder={reorderTasks} onLog={setExecutionTask} /></SoftPanel> : null}
+        {view === "funnel" ? <TaskFunnel tasks={filteredTasks} onEdit={openEdit} onMove={patchTask} onCapture={async (title) => { const created = await createTodoTasks({ items: [{ title, date: null }] }); setTasks((current) => [...created, ...current]); }} /> : null}
+        {view === "weekly" ? <TodoWeeklyCalendar tasks={filteredTasks} objectives={objectiveOptions} today={today} startDate={getWeekDateKeys(weekId)[0]} objectiveId={objectiveFilter === "all" || objectiveFilter === "unassigned" ? "" : objectiveFilter} onEdit={openEdit} onCreate={openCreate} onMove={patchTask} /> : null}
+        {view === "monthly" ? <TodoMonthlyRoadmap tasks={filteredTasks} objectives={objectiveOptions} month={month} today={today} onEdit={openEdit} onCreate={openCreate} /> : null}
+        {view === "insights" ? <><TodoExecutionInsights tasks={filteredTasks} objectives={objectiveOptions} today={today} onEdit={openEdit} onCreate={openCreate} /><TodoObjectiveTrajectory tasks={filteredTasks} objectives={objectiveOptions} month={scope === "month" ? month : today.slice(0, 7)} /></> : null}
+      </>}
+      <PerformanceStrip refreshKey={tasks} />
+      {executionTask ? <TodoExecutionDrawer key={executionTask.id} task={executionTask} today={today} onClose={() => setExecutionTask(null)} onSave={saveExecution} /> : null}
 
       <Drawer
         open={drawer != null}
@@ -417,6 +472,7 @@ export function TodoClient({ today }: { today: string }) {
           </div>
         }
       >
+        {drawer?.kind === "edit" ? <div className="mb-4 flex flex-wrap gap-2"><SecondaryButton type="button" onClick={() => { const task = tasks.find((item) => item.id === drawer.id); if (task) { setDrawer(null); setExecutionTask(task); } }}>{translate("todo.logExecution")}</SecondaryButton><a className="focus-ring rounded-2xl px-3 py-2 text-sm text-accent" href="/objectives">{fr ? "Ouvrir les objectifs et prévisions" : "Open objectives & forecasts"}</a></div> : null}
         {drawer ? (
           <form id="task-editor-form" onSubmit={saveTask} className="space-y-4">
             {drawerError || objectiveOptionsError ? (
@@ -493,7 +549,7 @@ export function TodoClient({ today }: { today: string }) {
                   onClick={() =>
                     setDrawer((current) =>
                       current?.kind === "create"
-                        ? { ...current, rows: [...current.rows, newRow(getCreationDate(scope, date, weekId))] }
+                        ? { ...current, rows: [...current.rows, { ...newRow(current.single.date), objectiveId: current.single.objectiveId }] }
                         : current
                     )
                   }
