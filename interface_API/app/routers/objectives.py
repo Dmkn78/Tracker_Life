@@ -8,6 +8,9 @@ from ..database import get_db
 from ..models import Objective, Task, User, WeeklyPlanBlock
 from ..security import get_current_user
 from ..core.dates import get_iso_week_id, parse_date_key, to_date_key
+from ..core.completion import record_completion
+from ..core.objective_progress import record_objective_progress
+from ..core.performance_work import recorded_day_minutes
 from ..core.objectives import (
     bootstrap_objectives_demo,
     default_objective_title,
@@ -132,9 +135,11 @@ def create_objective(
         color=body.color or "#8da2fb",
         sortOrder=body.sort_order,
     )
+    record_completion(objective, None)
     db.add(objective)
     db.flush()
     sync_objective_tasks(db, user.id, objective.id, body.linked_task_ids)
+    record_objective_progress(db, user.id)
     return {
         "objective": {"id": objective.id},
         "data": get_objectives_data(db, user.id, body.week_id or _normalize_week_id(body)),
@@ -164,6 +169,12 @@ def update_objective(
         if body.category is not None:
             existing.category = body.category.value
         if body.date is not None:
+            if existing.executionStatus in ("done", "partial"):
+                if body.date > parse_date_key(to_date_key()):
+                    raise HTTPException(400, "Recorded work cannot be moved into the future")
+                db.execute(select(User.id).where(User.id == user.id).with_for_update()).scalar_one()
+                if recorded_day_minutes(db, user.id, body.date, existing.id) + (existing.actualMinutes or 0) > 1440:
+                    raise HTTPException(400, "Recorded work cannot exceed 24 hours in one day")
             existing.date = body.date
         if "start_time" in provided_fields:
             existing.startTime = body.start_time or None
@@ -188,6 +199,7 @@ def update_objective(
     ).scalar_one_or_none()
     if existing is None:
         raise HTTPException(status_code=404, detail="Objective not found")
+    previous_status = existing.status
     provided_fields = body.model_fields_set
     if "parent_id" in provided_fields:
         _validate_objective_parent(db, user.id, existing.id, body.parent_id)
@@ -216,9 +228,11 @@ def update_objective(
         existing.sortOrder = body.sort_order
     if body.archived is not None:
         existing.archived = body.archived
+    record_completion(existing, previous_status)
     db.flush()
     if body.linked_task_ids is not None:
         sync_objective_tasks(db, user.id, existing.id, body.linked_task_ids)
+    record_objective_progress(db, user.id)
     return {
         "objective": {"id": existing.id},
         "data": get_objectives_data(
@@ -265,4 +279,5 @@ def delete_objective(
     )
     existing.archived = True
     db.flush()
+    record_objective_progress(db, user.id)
     return get_objectives_data(db, user.id, week_id)

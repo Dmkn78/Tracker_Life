@@ -30,7 +30,7 @@ export type ObjectiveRecord = {
 export type ObjectiveTask = {
   id: string;
   title: string;
-  date: string;
+  date: string | null;
   status: ObjectiveTaskStatus;
   importance: ObjectiveTaskImportance;
   completionPercent: number;
@@ -55,6 +55,8 @@ export type ObjectiveSummary = ObjectiveRecord & {
 };
 
 export type WeeklyPlanBlock = {
+  actualMinutes: number | null;
+  executionStatus: "planned" | "done" | "partial" | "not_done";
   id: string;
   title: string;
   date: string;
@@ -142,6 +144,8 @@ export type ObjectiveStats = {
 };
 
 export type ObjectiveWeekSummary = {
+  focusTargetMinutes: number;
+  plannedFocusMinutes: number;
   totalMinutes: number;
   totalMinutesLabel: string;
   busiestDay: ObjectiveNamedDayLoad | null;

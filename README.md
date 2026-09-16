@@ -23,6 +23,8 @@ La documentation complète se trouve dans [`docs/README.md`](docs/README.md).
 - Notions de programmation : [`docs/02-FONDAMENTAUX-DU-CODE.md`](docs/02-FONDAMENTAUX-DU-CODE.md)
 - Architecture : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Guide de maintenance : [`docs/08-MAINTENANCE-ET-REGLES.md`](docs/08-MAINTENANCE-ET-REGLES.md)
+- Performance, capital fictif et rewards : [`docs/performance-mvp.md`](docs/performance-mvp.md)
+- Objectifs, roadmap, exécution, prévisions et mode crème : [`docs/objectives-planning.md`](docs/objectives-planning.md)
 
 ## Démarrage local rapide sous Windows
 
@@ -579,4 +581,14 @@ Si tu changes une variable d’environnement, redémarre les services :
 
 ```bash
 systemctl restart life-api life-whisper life-web
+```
+
+## Android — Life Regime
+
+Version Capacitor avec les composants existants, un entonnoir de tâches et une saisie rapide depuis les notifications. Voir [le guide Android](docs/android.md) pour le serveur, le build et l’installation personnelle de l’APK.
+
+```powershell
+npm run build
+npx cap sync android
+npx cap open android
 ```

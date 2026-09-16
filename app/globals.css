@@ -59,6 +59,30 @@
   background: #f4f5f9;
 }
 
+:root.cream,
+:root.adaptive[data-adaptive-palette="cream"] {
+  color-scheme: light;
+  --color-ink: 38 39 45;
+  --color-muted: 103 97 89;
+  --color-paper: 239 232 218;
+  --color-shell: 232 223 206;
+  --color-panel: 249 244 233;
+  --color-panel2: 242 234 220;
+  --color-line: 214 203 183;
+  --color-accent: 94 89 181;
+  --color-onaccent: 255 255 255;
+  --color-violet: 105 81 174;
+  --color-blueglass: 79 94 156;
+  --color-good: 35 117 85;
+  --color-warn: 137 95 24;
+  --color-risk: 174 65 70;
+  --body-gradient: linear-gradient(180deg, #f4eddf 0%, #ece3d2 100%);
+  background: #efe8da;
+}
+
+:root.cream .text-slate-200 { color: rgb(var(--color-ink)); }
+:root.cream .shadow-\[0_18px_48px_rgba\(2\,6\,23\,0\.18\)\] { box-shadow: 0 12px 36px rgb(55 49 38 / 0.05); }
+
 :root.sunlight,
 :root.adaptive[data-adaptive-palette="sunlight"] {
   color-scheme: light;

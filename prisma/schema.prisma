@@ -95,7 +95,19 @@ enum TimeAllocationPeriod {
   MONTH
 }
 
+model TaskCapture {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId String? @unique
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  title String
+  @@index([userId])
+}
+
 model User {
+  taskCaptures TaskCapture[]
+  performanceWeeks PerformanceWeek[]
   id            String          @id @default(cuid())
   label         String          @default("Local user")
   calorieTarget Int             @default(2200)
@@ -268,6 +280,10 @@ model DailyLog {
 }
 
 model Task {
+  capture TaskCapture?
+  workSessions WeeklyPlanBlock[]
+  planning TaskPlan?
+  completedAt       DateTime?
   id                String         @id @default(cuid())
   userId            String
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -489,6 +505,10 @@ model WeeklyReport {
 }
 
 model Objective {
+  planning ObjectivePlan?
+  progressEntries ObjectiveProgressEntry[]
+  completedAt DateTime?
+  completionDeadline DateTime? @db.Date
   id          String             @id @default(cuid())
   userId      String
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -518,6 +538,11 @@ model Objective {
 }
 
 model WeeklyPlanBlock {
+  taskId String?
+  task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  recovery BlockRecovery?
+  actualMinutes Int?
+  executionStatus String @default("planned")
   id              String             @id @default(cuid())
   userId          String
   user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -536,4 +561,50 @@ model WeeklyPlanBlock {
 
   @@index([userId, date])
   @@index([userId, objectiveId])
+  @@unique([taskId, date])
+}
+
+model PerformanceWeek {
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart DateTime @db.Date
+  targetMinutes Int @default(2400)
+
+  @@id([userId, weekStart])
+}
+
+model ObjectivePlan {
+  objectiveId String @id
+  objective Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  startDate DateTime @db.Date
+  effortMinutes Int @default(0)
+  impact Int @default(50)
+  manualProgress Int?
+  ignoredUntil DateTime? @db.Date
+}
+
+model ObjectiveProgressEntry {
+  objectiveId String
+  objective Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  date DateTime @db.Date
+  progress Int
+  source String @default("execution")
+  @@id([objectiveId, date])
+}
+
+model TaskPlan {
+  taskId String @id
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  optimisticMinutes Int
+  likelyMinutes Int
+  pessimisticMinutes Int
+  predecessorIds String[] @default([])
+}
+
+model BlockRecovery {
+  blockId String @id
+  block WeeklyPlanBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  action String
+  replacementId String?
+  createdAt DateTime @default(now())
 }

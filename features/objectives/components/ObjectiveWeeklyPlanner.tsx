@@ -1,6 +1,6 @@
 import { CirclePlus } from "lucide-react";
 import { formatDuration } from "@/components/DurationInput";
-import { Card, GhostButton, Pill } from "@/components/ui";
+import { Card, GhostButton, Pill, SecondaryButton } from "@/components/ui";
 import type {
   ObjectiveWeeklyDay,
   WeeklyPlanBlock
@@ -12,6 +12,7 @@ type ObjectiveWeeklyPlannerProps = {
   highLoadDayCount: number;
   onCreateBlock: (date: string) => void;
   onEditBlock: (block: WeeklyPlanBlock) => void;
+  onLogBlock: (block: WeeklyPlanBlock) => void;
 };
 
 export function ObjectiveWeeklyPlanner({
@@ -19,7 +20,8 @@ export function ObjectiveWeeklyPlanner({
   totalMinutesLabel,
   highLoadDayCount,
   onCreateBlock,
-  onEditBlock
+  onEditBlock,
+  onLogBlock
 }: ObjectiveWeeklyPlannerProps) {
   return (
     <Card>
@@ -75,6 +77,7 @@ export function ObjectiveWeeklyPlanner({
                 </div>
               ) : (
                 day.blocks.map((block) => (
+                  <div key={block.id}>
                   <button
                     key={block.id}
                     type="button"
@@ -97,6 +100,10 @@ export function ObjectiveWeeklyPlanner({
                       </div>
                     ) : null}
                   </button>
+                  <SecondaryButton className="mt-1 w-full text-xs" onClick={() => onLogBlock(block)}>
+                    {block.executionStatus === "planned" ? "Log execution" : `${block.executionStatus.replace("_", " ")} · ${block.actualMinutes === null ? "time not logged" : formatDuration(block.actualMinutes)}`}
+                  </SecondaryButton>
+                  </div>
                 ))
               )}
             </div>

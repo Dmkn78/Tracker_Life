@@ -113,10 +113,19 @@ class EmotionalReview(Base):
     updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
 
 
+class TaskCapture(Base):
+    __tablename__ = "TaskCapture"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    userId: Mapped[str] = mapped_column(String)
+    taskId: Mapped[str | None] = mapped_column(String)
+    title: Mapped[str] = mapped_column(Text)
+
+
 class Task(Base):
     __tablename__ = "Task"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    completedAt: Mapped[datetime | None] = mapped_column(DateTime)
     userId: Mapped[str] = mapped_column(String, nullable=False)
     objectiveId: Mapped[str | None] = mapped_column(String)
     companyId: Mapped[str | None] = mapped_column(String)
@@ -359,6 +368,8 @@ class Objective(Base):
     __tablename__ = "Objective"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    completedAt: Mapped[datetime | None] = mapped_column(DateTime)
+    completionDeadline: Mapped[date | None] = mapped_column(Date)
     userId: Mapped[str] = mapped_column(String, nullable=False)
     parentId: Mapped[str | None] = mapped_column(String)
     title: Mapped[str] = mapped_column(Text, nullable=False)
@@ -381,6 +392,9 @@ class WeeklyPlanBlock(Base):
     __tablename__ = "WeeklyPlanBlock"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    taskId: Mapped[str | None] = mapped_column(String)
+    actualMinutes: Mapped[int | None] = mapped_column(Integer)
+    executionStatus: Mapped[str] = mapped_column(Text, nullable=False, default="planned")
     userId: Mapped[str] = mapped_column(String, nullable=False)
     objectiveId: Mapped[str | None] = mapped_column(String)
     title: Mapped[str] = mapped_column(Text, nullable=False)
@@ -393,3 +407,46 @@ class WeeklyPlanBlock(Base):
     note: Mapped[str | None] = mapped_column(Text)
     createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
     updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class PerformanceWeek(Base):
+    __tablename__ = "PerformanceWeek"
+
+    userId: Mapped[str] = mapped_column(String, primary_key=True)
+    weekStart: Mapped[date] = mapped_column(Date, primary_key=True)
+    targetMinutes: Mapped[int] = mapped_column(Integer, nullable=False, default=2400)
+
+
+class ObjectivePlan(Base):
+    __tablename__ = "ObjectivePlan"
+    objectiveId: Mapped[str] = mapped_column(String, primary_key=True)
+    startDate: Mapped[date] = mapped_column(Date, nullable=False)
+    effortMinutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    impact: Mapped[int] = mapped_column(Integer, nullable=False, default=50)
+    manualProgress: Mapped[int | None] = mapped_column(Integer)
+    ignoredUntil: Mapped[date | None] = mapped_column(Date)
+
+
+class ObjectiveProgressEntry(Base):
+    __tablename__ = "ObjectiveProgressEntry"
+    objectiveId: Mapped[str] = mapped_column(String, primary_key=True)
+    date: Mapped[date] = mapped_column(Date, primary_key=True)
+    progress: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False, default="execution")
+
+
+class TaskPlan(Base):
+    __tablename__ = "TaskPlan"
+    taskId: Mapped[str] = mapped_column(String, primary_key=True)
+    optimisticMinutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    likelyMinutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    pessimisticMinutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    predecessorIds: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+
+
+class BlockRecovery(Base):
+    __tablename__ = "BlockRecovery"
+    blockId: Mapped[str] = mapped_column(String, primary_key=True)
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    replacementId: Mapped[str | None] = mapped_column(String)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)

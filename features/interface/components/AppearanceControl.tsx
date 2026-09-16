@@ -16,6 +16,7 @@ import { useAppearance } from "./AppearanceProvider";
 const appearanceLabelKeys: Record<AppearancePreference, TranslationKey> = {
   dark: "appearance.dark",
   light: "appearance.light",
+  cream: "appearance.cream",
   sunlight: "appearance.sunlight",
   "low-light": "appearance.lowLight",
   warm: "appearance.warm",
@@ -25,6 +26,7 @@ const appearanceLabelKeys: Record<AppearancePreference, TranslationKey> = {
 const appearanceDescriptionKeys: Record<AppearancePreference, TranslationKey> = {
   dark: "appearance.darkDescription",
   light: "appearance.lightDescription",
+  cream: "appearance.creamDescription",
   sunlight: "appearance.sunlightDescription",
   "low-light": "appearance.lowLightDescription",
   warm: "appearance.warmDescription",

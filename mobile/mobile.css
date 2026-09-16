@@ -1,0 +1,17 @@
+body { overscroll-behavior-y: contain; }
+.mobile-app { min-height: 100dvh; }
+.mobile-header { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top) + 10px) 16px 10px; background: rgb(var(--color-shell)); border-bottom: 1px solid rgb(var(--color-line)); }
+.mobile-content { max-width: 1100px; margin: auto; padding: 16px 12px calc(88px + env(safe-area-inset-bottom)); }
+.mobile-navigation { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; border-top: 1px solid rgb(var(--color-line)); background: rgb(var(--color-shell)); padding: 4px 6px calc(4px + env(safe-area-inset-bottom)); }
+.mobile-app input, .mobile-app select, .mobile-app textarea { font-size: 16px; }
+.mobile-app button { -webkit-tap-highlight-color: transparent; }
+.mobile-app .calendar-engine .fc-timegrid-slot { height: 34px; }
+.mobile-app .calendar-engine .fc-timegrid-axis { width: 42px; }
+@media (max-width: 600px) {
+  .mobile-content h2 { font-size: 1.12rem; }
+  .mobile-content section { padding: 12px; }
+  .mobile-content .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 16px; }
+  .mobile-content .grid.md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .mobile-content .grid.md\:grid-cols-3 > div { padding: 10px; }
+  .mobile-content .grid.md\:grid-cols-3 .text-3xl { font-size: 1.3rem; }
+}

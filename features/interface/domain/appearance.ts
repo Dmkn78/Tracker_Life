@@ -1,6 +1,7 @@
 export const APPEARANCE_PREFERENCES = [
   "dark",
   "light",
+  "cream",
   "sunlight",
   "low-light",
   "warm",
@@ -10,6 +11,7 @@ export const APPEARANCE_PREFERENCES = [
 export const MANUAL_PALETTES = [
   "dark",
   "light",
+  "cream",
   "sunlight",
   "low-light",
   "warm"

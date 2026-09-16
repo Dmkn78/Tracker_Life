@@ -2,6 +2,7 @@ import {
   expectBoolean,
   expectJsonObject,
   expectNumber,
+  parseJsonArray,
   expectOptionalNullableString,
   expectString,
   requestJson
@@ -82,6 +83,12 @@ export function updateTodoTask(
   });
 }
 
+export function logTodoExecution(payload: { taskId: string; date: string; result: "done" | "partial" | "not_done"; actualMinutes: number | null }): Promise<TodoTask> {
+  return requestJson("/api/tasks/execution", parseUpdatedTodoTaskResponse, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+  });
+}
+
 export function reorderTodoTasks(ids: string[]): Promise<void> {
   return requestJson("/api/tasks/reorder", () => undefined, {
     method: "PATCH",
@@ -122,7 +129,8 @@ function parseObjectiveOptionsResponse(payload: unknown): ObjectiveOption[] {
     return {
       id: expectString(record.id, `${context}.id`),
       title: expectString(record.title, `${context}.title`),
-      horizon: expectString(record.horizon, `${context}.horizon`)
+      horizon: expectString(record.horizon, `${context}.horizon`),
+      color: expectString(record.color, `${context}.color`)
     };
   });
 }
@@ -136,6 +144,10 @@ function parseTodoTask(payload: unknown, context: string): TodoTask {
   const task = expectJsonObject(payload, context);
   return {
     id: expectString(task.id, `${context}.id`),
+    workSessions: parseJsonArray(task.workSessions ?? [], `${context}.workSessions`, (entry, location) => {
+      const session = expectJsonObject(entry, location);
+      return { id: expectString(session.id, location), date: expectString(session.date, location), executionStatus: expectString(session.executionStatus, location), actualMinutes: session.actualMinutes === null ? null : expectNumber(session.actualMinutes, location) };
+    }),
     title: expectString(task.title, `${context}.title`),
     description: expectOptionalNullableString(task.description, `${context}.description`) ?? null,
     date: expectOptionalNullableString(task.date, `${context}.date`) ?? null,

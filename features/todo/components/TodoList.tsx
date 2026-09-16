@@ -50,6 +50,7 @@ export function TodoList({
   onEdit,
   onAdd,
   onDelete,
+  onLog,
   onReorder
 }: {
   tasks: TodoTask[];
@@ -57,6 +58,7 @@ export function TodoList({
   onEdit: (task: TodoTask) => void;
   onAdd: () => void;
   onDelete: (task: TodoTask) => void;
+  onLog: (task: TodoTask) => void;
   onReorder: (orderedIds: string[]) => void;
 }) {
   const { translate } = useLocale();
@@ -105,6 +107,7 @@ export function TodoList({
               onPatch={onPatch}
               onEdit={onEdit}
               onDelete={onDelete}
+              onLog={onLog}
               onMoveUp={() => moveBy(task.id, -1)}
               onMoveDown={() => moveBy(task.id, 1)}
               canMoveUp={index > 0}
@@ -122,6 +125,7 @@ function SortableTodoRow(props: {
   onPatch: (id: string, patch: TaskWritePayload) => void;
   onEdit: (task: TodoTask) => void;
   onDelete: (task: TodoTask) => void;
+  onLog: (task: TodoTask) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   canMoveUp: boolean;
@@ -169,6 +173,7 @@ function TodoRow({
   onPatch,
   onEdit,
   onDelete,
+  onLog,
   onMoveUp,
   onMoveDown,
   canMoveUp,
@@ -179,6 +184,7 @@ function TodoRow({
   onPatch: (id: string, patch: TaskWritePayload) => void;
   onEdit: (task: TodoTask) => void;
   onDelete: (task: TodoTask) => void;
+  onLog: (task: TodoTask) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   canMoveUp: boolean;
@@ -189,7 +195,7 @@ function TodoRow({
   const done = task.status === "done" || task.completionPercent >= 100;
   return (
     <SoftPanel className="p-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-3">
             {dragHandle}
@@ -256,6 +262,7 @@ function TodoRow({
                 <Pill className={importanceTone(task.importance)}>{translate(IMPORTANCE_LABEL_KEYS[task.importance])}</Pill>
                 {task.productive ? <Pill>{translate("todo.productive")}</Pill> : null}
                 <Pill>{formatDuration(task.estimatedMinutes ?? 0)}</Pill>
+                {task.workSessions?.length ? <Pill>{formatDuration(task.workSessions.reduce((sum, session) => sum + (session.actualMinutes ?? 0), 0))} · {translate("todo.logExecution")}</Pill> : null}
               </div>
             </div>
           </div>
@@ -268,8 +275,8 @@ function TodoRow({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 lg:min-w-[260px] lg:items-end">
-          <Segmented aria-label={translate("todo.progressOptions")} className="w-full lg:w-auto">
+        <div className="flex w-full flex-col gap-3 xl:w-[400px] xl:shrink-0 xl:items-end">
+          <Segmented aria-label={translate("todo.progressOptions")} className="w-full xl:w-auto">
             {[0, 50, 100].map((value) => (
               <SegmentedButton
                 key={value}
@@ -281,14 +288,15 @@ function TodoRow({
                     notDoneReason: null
                   })
                 }
-                className="flex-1 lg:flex-none"
+                className="flex-1 xl:flex-none"
               >
                 {value}%
               </SegmentedButton>
             ))}
           </Segmented>
-          <div className="flex w-full flex-wrap gap-2 lg:justify-end">
-            <Segmented aria-label={translate("todo.statusOptions")} className="w-full sm:w-auto sm:flex-1 lg:flex-none">
+          <div className="flex w-full flex-wrap gap-2 xl:justify-end">
+            <SecondaryButton disabled={task.status === "cancelled"} onClick={() => onLog(task)}>{translate("todo.logExecution")}</SecondaryButton>
+            <Segmented aria-label={translate("todo.statusOptions")} className="w-full sm:w-auto sm:flex-1 xl:flex-none">
               {QUICK_STATUS_OPTIONS.map((status) => (
                 <SegmentedButton
                   key={status}
@@ -298,7 +306,7 @@ function TodoRow({
                     completionPercent: completionPercentForTodoStatus(task.completionPercent, status),
                     notDoneReason: status === "not_done" ? task.notDoneReason : null
                   })}
-                  className="min-w-[88px] flex-1 text-xs lg:flex-none"
+                  className="min-w-[88px] flex-1 text-xs xl:flex-none"
                 >
                   {translate(STATUS_LABEL_KEYS[status])}
                 </SegmentedButton>

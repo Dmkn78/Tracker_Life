@@ -2,7 +2,9 @@
 
 import { ChevronLeft, ChevronRight, CirclePlus, GripVertical } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { GhostButton, Metric, PrimaryButton, SecondaryButton, SectionHeader } from "@/components/ui";
+import { Drawer, GhostButton, Metric, PrimaryButton, SecondaryButton, SectionHeader } from "@/components/ui";
+import { PerformanceStrip } from "@/features/performance/components/PerformanceStrip";
+import { BlockExecutionForm } from "@/features/performance/components/BlockExecutionForm";
 import {
   deleteObjective as deleteObjectiveRequest,
   installObjectivesDemo,
@@ -19,6 +21,7 @@ import {
   type ObjectiveStructureView
 } from "@/features/objectives/components/ObjectiveHierarchyPanel";
 import { ObjectiveWeeklyPlanner } from "@/features/objectives/components/ObjectiveWeeklyPlanner";
+import { ObjectivePlanningWorkspace } from "./ObjectivePlanningWorkspace";
 import type { ObjectivesData } from "@/features/objectives/domain/objective";
 import {
   defaultObjectiveDraft,
@@ -40,6 +43,7 @@ export function ObjectivesClient({ initialData }: ObjectivesClientProps) {
   const [saving, setSaving] = useState(false);
   const [loadingWeek, setLoadingWeek] = useState(false);
   const [error, setError] = useState("");
+  const [executionBlock, setExecutionBlock] = useState<ObjectivesData["weeklyBlocks"][number] | null>(null);
   const loadControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => loadControllerRef.current?.abort(), []);
@@ -105,13 +109,17 @@ export function ObjectivesClient({ initialData }: ObjectivesClientProps) {
     });
   }
 
-  function openCreateBlock(date: string, objectiveId = "") {
+  function openCreateBlock(date: string, objectiveId = "", startTime?: string) {
+    const startMinutes = startTime ? Number(startTime.slice(0, 2)) * 60 + Number(startTime.slice(3, 5)) : 0;
+    const endMinutes = Math.min(1439, startMinutes + 60);
+    const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
     setDrawer({
       type: "weekly_block",
       mode: "create",
       draft: {
         ...defaultWeeklyBlockDraft(date),
-        objectiveId
+        objectiveId,
+        ...(startTime ? { startTime, endTime, durationMinutes: endMinutes - startMinutes, flexible: false } : {})
       }
     });
   }
@@ -272,14 +280,16 @@ export function ObjectivesClient({ initialData }: ObjectivesClientProps) {
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+      <ObjectivePlanningWorkspace data={data} onRefresh={() => load()} onCreateBlock={openCreateBlock} onEditBlock={openEditBlock} onLogBlock={setExecutionBlock} onEditObjective={openEditObjective}
+        onMilestone={(parentId, date) => setDrawer({ type: "objective", mode: "create", draft: { ...defaultObjectiveDraft(), parentId, kind: "milestone", horizon: "week", targetDate: date } })}
+        overview={(inspect) => <div className="space-y-4"><div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <ObjectiveHierarchyPanel
           data={data}
           structureView={structureView}
           isSaving={saving}
           onChangeStructureView={setStructureView}
           onCreateObjective={openCreateObjective}
-          onEditObjective={openEditObjective}
+          onEditObjective={(objective) => inspect(objective.id)}
           onInstallDemo={() => void installDemo()}
         />
         <ObjectiveExecutionSidebar
@@ -289,13 +299,21 @@ export function ObjectivesClient({ initialData }: ObjectivesClientProps) {
         />
       </div>
 
+      <PerformanceStrip refreshKey={data} />
+
       <ObjectiveWeeklyPlanner
         weeklyDays={data.weeklyDays}
         totalMinutesLabel={data.weekSummary.totalMinutesLabel}
         highLoadDayCount={stats.highLoadDays}
         onCreateBlock={openCreateBlock}
         onEditBlock={openEditBlock}
+        onLogBlock={setExecutionBlock}
       />
+      </div>} />
+
+      <Drawer open={executionBlock !== null} title={executionBlock?.title ?? "Log execution"} onClose={() => setExecutionBlock(null)}>
+        {executionBlock ? <BlockExecutionForm key={executionBlock.id} block={executionBlock} onSaved={() => { setExecutionBlock(null); void load(); }} /> : null}
+      </Drawer>
 
       <ObjectiveEditorDrawer
         editor={drawer}
