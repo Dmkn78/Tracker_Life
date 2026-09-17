@@ -1,10 +1,10 @@
 import { Capacitor, CapacitorHttp } from "@capacitor/core";
 import { configureApiTransport } from "@/lib/http/apiClient";
 import { serializeFormData } from "./formDataTransport";
-import { normalizeServerAddress } from "./serverAddress";
+import { normalizeConfiguredServerAddress } from "./serverConnection";
 
 export function connectApi(server: string): void {
-  const origin = normalizeServerAddress(server);
+  const origin = normalizeConfiguredServerAddress(server);
   configureApiTransport(async (path, options) => {
     if (!path.startsWith("/api/")) throw new Error("Unexpected API path");
     const url = `${origin}${path}`;

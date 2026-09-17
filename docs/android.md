@@ -48,7 +48,7 @@ cd interface_API
 
 Autoriser si nécessaire le port 8000 sur le réseau **privé** dans le pare-feu Windows. Dans **Réglages → Connexion à mes données**, saisir `http://IP_LOCALE_DU_PC:8000`, puis la clé habituelle. `127.0.0.1` sur le téléphone ne désigne pas le PC. L’émulateur Android peut utiliser `http://10.0.2.2:8000`.
 
-Le transport HTTP natif Capacitor conserve le cookie de session émis par l’API ; la clé saisie est effacée de l’état du formulaire après connexion. HTTP est accepté uniquement pour une IP privée ou localhost. Pour accéder aux données en dehors du Wi-Fi personnel, fournir un serveur HTTPS accessible au téléphone. Aucune ouverture de port publique n’est effectuée par ce projet. Si l’API impose des cookies `Secure`, utiliser HTTPS.
+Le transport HTTP natif Capacitor conserve le cookie de session émis par l’API ; la clé saisie est effacée de l’état du formulaire après connexion. HTTP est accepté pour une IP privée ou localhost. Une APK personnelle peut également autoriser une seule origine HTTP par IP, définie explicitement lors du build avec `VITE_PERSONAL_HTTP_ORIGIN=http://IP_DU_VPS`. Le port doit correspondre exactement. Cette exception ne concerne pas les autres serveurs. En HTTP, la clé, les données et les fichiers audio circulent sans chiffrement. Pour accéder aux données en dehors du Wi-Fi personnel, fournir un serveur HTTPS accessible au téléphone. Aucune ouverture de port publique n’est effectuée par ce projet. Si l’API impose des cookies `Secure`, utiliser HTTPS.
 
 Les captures sont rattachées à l’adresse du serveur. Changer d’adresse ne transfère pas automatiquement les captures en attente à un autre serveur ; reconnecter l’ancienne adresse pour les synchroniser.
 
@@ -72,7 +72,8 @@ La notification est facultative, sans service permanent ni synchronisation rése
 - **Tâches** : liste et éditeur actuels, progression, statut, journal d’exécution et filtres.
 - **Objectifs** : hiérarchie, milestones, planning et prévisions existants.
 - **Capital** : métriques et règles existantes, fondées sur les données enregistrées.
-- Navigation à cinq onglets, bouton + accessible en haut, teintes crème et zones adaptées au clavier et aux bords de l’écran.
+- **Logs** : journal quotidien, sélection de date et dictée du résumé avec Parakeet V3 côté serveur. L’interface embarquée utilise HTTPS localement pour autoriser le microphone, indépendamment du protocole de l’API. La permission microphone est demandée au premier enregistrement.
+- Navigation à six onglets, bouton + accessible en haut, teintes crème et zones adaptées au clavier et aux bords de l’écran.
 
 Seule la capture rapide est disponible hors connexion. La consultation et l’édition des données existantes nécessitent le serveur. La connexion n’est pas un mode de synchronisation complet entre plusieurs bases de données.
 

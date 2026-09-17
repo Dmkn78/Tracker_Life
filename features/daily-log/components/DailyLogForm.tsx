@@ -45,11 +45,13 @@ import { appendSummaryTranscript } from "@/features/daily-log/domain/summaryTran
 export function DailyLogForm({
   selectedDate,
   defaultSleepDelayMin,
-  calorieTarget
+  calorieTarget,
+  draftStorageKey
 }: {
   selectedDate: string;
   defaultSleepDelayMin: number;
   calorieTarget: number;
+  draftStorageKey?: string;
 }) {
   const { locale } = useLocale();
   const copy = DAILY_LOG_COPY[locale];
@@ -67,7 +69,7 @@ export function DailyLogForm({
   const activeDateRef = useRef(selectedDate);
   const pendingAutosaveTimerRef = useRef<number | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const storageKey = `life-regime:daily-log:${selectedDate}`;
+  const storageKey = draftStorageKey ?? `life-regime:daily-log:${selectedDate}`;
 
   useEffect(() => {
     loaded.current = false;
