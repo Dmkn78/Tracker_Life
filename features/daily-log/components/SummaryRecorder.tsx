@@ -5,31 +5,31 @@ import { useEffect, useRef, useState } from "react";
 import { IconButton } from "@/components/ui";
 import { transcribeAudio } from "@/lib/whisper";
 
-type RecordingState = "idle" | "requesting" | "recording" | "transcribing";
+type RecordingState = "idle" | "requesting" | "recording" | "uploading" | "transcribing";
 type SummaryRecorderProps = {
   locale: "fr" | "en";
   disabled: boolean;
   onTranscript: (text: string) => void;
 };
-const MAX_RECORDING_SECONDS = 120;
-const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+const MAX_RECORDING_SECONDS = 30 * 60;
+const MAX_AUDIO_BYTES = 100 * 1024 * 1024;
 const AUDIO_TYPES = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm", "audio/ogg;codecs=opus"];
 const COPY = {
   fr: {
-    tooLarge: "Le fichier audio doit faire moins de 25 Mo.",
+    tooLarge: "Le fichier audio doit faire moins de 100 Mo.",
     start: "Dicter le résumé", stop: "Arrêter et transcrire", requesting: "Autorisation du micro…",
-    transcribing: "Transcription en cours…", recording: "Enregistrement", upload: "Importer un audio",
-    hint: "Parakeet V3 multilingue · Le texte est ajouté automatiquement au résumé (2 min maximum).",
+    transcribing: "Transcription en cours…", uploading: "Envoi de l’audio…", cancel: "Annuler la transcription", cancelled: "Transcription annulée. Tu peux réessayer avec cet audio.", recording: "Enregistrement", upload: "Importer un audio",
+    hint: "Parakeet V3 multilingue · Le texte est ajouté automatiquement au résumé (30 min maximum, 100 Mo). Garde cet onglet ouvert pendant le traitement.",
     unsupported: "Le microphone nécessite HTTPS et un navigateur compatible. Tu peux aussi importer un audio.",
     microphone: "Le microphone est indisponible ou son accès a été refusé.",
     failed: "La transcription a échoué. Réessaie avec cet audio.", empty: "Aucune parole détectée. Réessaie en parlant plus près du micro.",
     recordingFailed: "L’enregistrement a échoué. Réessaie.", retry: "Réessayer la transcription"
   },
   en: {
-    tooLarge: "The audio file must be smaller than 25 MB.",
+    tooLarge: "The audio file must be smaller than 100 MB.",
     start: "Dictate summary", stop: "Stop and transcribe", requesting: "Requesting microphone…",
-    transcribing: "Transcribing…", recording: "Recording", upload: "Upload audio",
-    hint: "Multilingual Parakeet V3 · Text is added to your summary automatically (2 minutes maximum).",
+    transcribing: "Transcribing…", uploading: "Uploading audio…", cancel: "Cancel transcription", cancelled: "Transcription cancelled. You can retry with this audio.", recording: "Recording", upload: "Upload audio",
+    hint: "Multilingual Parakeet V3 · Text is added to your summary automatically (30 minutes maximum, 100 MB). Keep this tab open while processing.",
     unsupported: "The microphone requires HTTPS and a supported browser. You can also upload audio.",
     microphone: "The microphone is unavailable or permission was denied.",
     failed: "Transcription failed. Try again with this audio.", empty: "No speech detected. Try speaking closer to the microphone.",
@@ -40,6 +40,7 @@ const COPY = {
 export function SummaryRecorder({ locale, disabled, onTranscript }: SummaryRecorderProps) {
   const copy = COPY[locale];
   const [state, setState] = useState<RecordingState>("idle");
+  const [progress, setProgress] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
   const [retryAudio, setRetryAudio] = useState<File>();
@@ -84,18 +85,24 @@ export function SummaryRecorder({ locale, disabled, onTranscript }: SummaryRecor
     const controller = new AbortController();
     requestRef.current = controller;
     busyRef.current = true;
-    setState("transcribing");
+    setState("uploading");
+    setProgress(0);
     setError("");
     setRetryAudio(file);
     try {
-      const transcript = (await transcribeAudio(file, controller.signal)).trim();
+      const transcript = (await transcribeAudio(file, controller.signal, (percent) => {
+        if (generation === generationRef.current && !controller.signal.aborted) {
+          setState("transcribing");
+          setProgress(percent);
+        }
+      })).trim();
       if (generation !== generationRef.current || controller.signal.aborted) return;
       if (!transcript) throw new Error(copy.empty);
       onTranscriptRef.current(transcript);
       setRetryAudio(undefined);
     } catch (cause) {
-      if (generation !== generationRef.current || controller.signal.aborted) return;
-      setError(cause instanceof Error ? cause.message : copy.failed);
+      if (generation !== generationRef.current) return;
+      setError(controller.signal.aborted ? copy.cancelled : cause instanceof Error ? cause.message : copy.failed);
     } finally {
       if (generation === generationRef.current) {
         busyRef.current = false;
@@ -150,7 +157,12 @@ export function SummaryRecorder({ locale, disabled, onTranscript }: SummaryRecor
     const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     const chunks: Blob[] = [];
     recorderRef.current = recorder;
-    recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+    let audioBytes = 0;
+    recorder.ondataavailable = (event) => {
+      if (event.data.size) chunks.push(event.data);
+      audioBytes += event.data.size;
+      if (audioBytes >= MAX_AUDIO_BYTES - 1024 * 1024 && recorder.state === "recording") recorder.stop();
+    };
     recorder.onstop = () => finishRecording(recorder, chunks);
     recorder.onerror = () => {
       recorder.onstop = null;
@@ -180,11 +192,12 @@ export function SummaryRecorder({ locale, disabled, onTranscript }: SummaryRecor
         disabled={disabled || (isBusy && !isRecording)} aria-pressed={isRecording}
         className={isRecording ? "border-risk/50 text-risk" : ""}>
         {isRecording ? <Square className="h-4 w-4 fill-current" /> : isBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
-        {isRecording ? copy.stop : state === "requesting" ? copy.requesting : state === "transcribing" ? copy.transcribing : copy.start}
+        {isRecording ? copy.stop : state === "requesting" ? copy.requesting : state === "uploading" ? copy.uploading : state === "transcribing" ? copy.transcribing : copy.start}
       </IconButton>
       <IconButton type="button" disabled={disabled || isBusy} onClick={() => inputRef.current?.click()}>
         <Upload className="h-4 w-4" />{copy.upload}
       </IconButton>
+      {state === "uploading" || state === "transcribing" ? <IconButton type="button" onClick={() => requestRef.current?.abort()}>{copy.cancel}</IconButton> : null}
       {isRecording ? <span role="status" className="flex items-center gap-2 text-sm text-risk"><span className="h-2 w-2 animate-pulse rounded-full bg-risk" />{copy.recording} {time}</span> : null}
       {error && retryAudio && !isBusy ? <IconButton type="button" disabled={disabled} onClick={() => { if (!busyRef.current) void transcribe(retryAudio); }}>{copy.retry}</IconButton> : null}
     </div>
@@ -194,7 +207,8 @@ export function SummaryRecorder({ locale, disabled, onTranscript }: SummaryRecor
       if (file && !busyRef.current && !disabled) void transcribe(file);
     }} />
     <p className="text-xs text-muted">{copy.hint}</p>
-    <p role="status" className="text-sm text-muted">{state === "transcribing" ? copy.transcribing : ""}</p>
+    <p role="status" className="text-sm text-muted">{state === "uploading" ? copy.uploading : state === "transcribing" ? `${copy.transcribing} ${progress}%` : ""}</p>
+    {state === "transcribing" ? <progress value={progress} max={100} aria-label={copy.transcribing} className="h-2 w-full accent-accent" /> : null}
     {error ? <p role="alert" className="text-sm text-risk">{error}</p> : null}
   </div>;
 }

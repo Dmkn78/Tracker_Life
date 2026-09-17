@@ -74,6 +74,8 @@ jobs:
       - name: Run API tests including PostgreSQL integration
         working-directory: interface_API
         run: python -m unittest discover -s tests -v
+      - name: Test bounded audio segmentation
+        run: python -m unittest discover -s services/tests -v
       - name: Build web and mobile
         run: pnpm build
       - name: Validate Android project synchronization

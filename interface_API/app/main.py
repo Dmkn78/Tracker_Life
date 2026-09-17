@@ -1,6 +1,7 @@
 """Life Regime Tracker standalone API application."""
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -27,11 +28,22 @@ from .routers import (
     thinking_notes,
     time_allocation,
     transcribe,
+    transcription_jobs,
 )
 
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        yield
+    finally:
+        await transcription_jobs.stop_jobs()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Life Regime Tracker API",
     version="0.1.0",
     description="Standalone backend API for the Life Regime Tracker frontend.",
@@ -95,6 +107,7 @@ app.include_router(settings_router.router)
 app.include_router(time_allocation.router)
 app.include_router(reports.router)
 app.include_router(transcribe.router)
+app.include_router(transcription_jobs.router)
 app.include_router(life_terminal.router)
 app.include_router(companies.router)
 app.include_router(tags.router)
