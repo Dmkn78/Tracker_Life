@@ -56,6 +56,18 @@ class TaskCaptureApiTests(unittest.TestCase):
         self.assertTrue(retry.json()["deleted"])
         self.assertIsNone(self.db.scalar(select(Task).where(Task.userId == self.user.id)))
 
+    def test_captured_task_can_be_placed_rescheduled_and_removed_from_planning(self):
+        task_id = self.client.post("/api/tasks/capture", json=self.payload).json()["taskId"]
+        for date, start, end in [("2026-09-17", "10:30", "12:00"), ("2026-09-18", "14:00", "15:30"), ("2026-09-19", None, None), (None, None, None)]:
+            response = self.client.patch("/api/tasks", json={"id": task_id, "date": date, "startTime": start, "endTime": end})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.db.expire_all()
+            tasks = self.client.get("/api/tasks?scope=all").json()["tasks"]
+            self.assertEqual(len(tasks), 1)
+            self.assertEqual((tasks[0]["id"], tasks[0]["date"], tasks[0]["startTime"], tasks[0]["endTime"]), (task_id, date, start, end))
+            self.assertEqual(tasks[0]["estimatedMinutes"], 0)
+        self.assertEqual(self.client.get("/api/performance").json()["daily"]["capitalCents"], 0)
+
     def test_identifier_cannot_be_reused_by_another_user_or_for_another_title(self):
         self.client.post("/api/tasks/capture", json=self.payload)
         self.assertEqual(self.client.post("/api/tasks/capture", json={**self.payload, "title": "Different"}).status_code, 409)

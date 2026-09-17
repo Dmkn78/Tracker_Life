@@ -12,7 +12,7 @@
     "build": "npm run build:web && npm run build:mobile",
     "typecheck": "tsc --noEmit",
     "test:appearance": "node --experimental-strip-types --test features/interface/domain/appearance.test.mjs",
-    "test:todo": "node --experimental-strip-types --test features/todo/domain/todoTask.test.mjs features/todo/domain/todoPlanning.test.mjs",
+    "test:todo": "node --experimental-strip-types --test features/todo/domain/todoTask.test.mjs features/todo/domain/todoPlanning.test.mjs features/todo/domain/funnelPlanning.test.mjs",
     "test:habits": "node --experimental-strip-types --test features/habits/domain/habitSchedule.test.mjs",
     "test:daily-log": "node --experimental-strip-types --test features/daily-log/domain/workRatio.test.mjs",
     "test:emotional": "node --experimental-strip-types --test features/emotional/domain/emotionalReview.test.mjs",
