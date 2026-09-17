@@ -8,7 +8,7 @@ if (!existsSync(join(sdk, "platforms", "android-36"))) {
   console.error("Android SDK 36 absent. Installe Android Studio et Android SDK Platform 36, puis définis ANDROID_HOME. Voir docs/android.md.");
   process.exit(1);
 }
-const result = spawnSync(process.platform === "win32" ? "gradlew.bat" : "./gradlew", ["--no-daemon", ":app:assembleDebug"], {
+const result = spawnSync(process.platform === "win32" ? "gradlew.bat" : "sh", [...(process.platform === "win32" ? [] : ["./gradlew"]), "--no-daemon", ":app:assembleDebug"], {
   cwd: join(root, "android"), stdio: "inherit", shell: process.platform === "win32",
   env: { ...process.env, ANDROID_HOME: sdk }
 });

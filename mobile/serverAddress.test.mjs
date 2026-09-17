@@ -13,3 +13,13 @@ test("rejects public cleartext, credentials, paths and alternate protocols", () 
     assert.throws(() => normalizeServerAddress(url));
   }
 });
+
+test("allows only the explicitly configured VPS HTTP origin", () => {
+  const personalOrigin = "http://203.0.113.10";
+  assert.equal(normalizeServerAddress(personalOrigin + "/", personalOrigin), personalOrigin);
+  for (const other of ["http://203.0.113.11", "http://203.0.113.10:8000", "http://203.0.113.10.example.com", "http://203.0.113.10@other.example.com"]) {
+    assert.throws(() => normalizeServerAddress(other, personalOrigin));
+  }
+  assert.throws(() => normalizeServerAddress(personalOrigin));
+  assert.throws(() => normalizeServerAddress("http://public.example.com", "http://public.example.com"));
+});

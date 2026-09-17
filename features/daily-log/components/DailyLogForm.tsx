@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, ChevronDown, Clock3, Mic, Moon, PencilLine, Save, Send, Square, X, Zap } from "lucide-react";
+import { Ban, ChevronDown, Clock3, Moon, PencilLine, Save, Send, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DurationInput } from "@/components/DurationInput";
 import { ScoreCard } from "@/components/ScoreCard";
@@ -39,16 +39,19 @@ import {
   type DayLogStatus
 } from "@/features/daily-log/domain/dailyLog";
 import { formatDisplayDate } from "@/lib/dates";
-import { transcribeAudio } from "@/lib/whisper";
+import { SummaryRecorder } from "./SummaryRecorder";
+import { appendSummaryTranscript } from "@/features/daily-log/domain/summaryTranscript";
 
 export function DailyLogForm({
   selectedDate,
   defaultSleepDelayMin,
-  calorieTarget
+  calorieTarget,
+  draftStorageKey
 }: {
   selectedDate: string;
   defaultSleepDelayMin: number;
   calorieTarget: number;
+  draftStorageKey?: string;
 }) {
   const { locale } = useLocale();
   const copy = DAILY_LOG_COPY[locale];
@@ -61,21 +64,12 @@ export function DailyLogForm({
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [recordCreatedAt, setRecordCreatedAt] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [audioFileName, setAudioFileName] = useState("");
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingError, setRecordingError] = useState("");
-  const [transcriptionError, setTranscriptionError] = useState("");
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const loaded = useRef(false);
   const activeDateRef = useRef(selectedDate);
   const pendingAutosaveTimerRef = useRef<number | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const audioInputRef = useRef<HTMLInputElement | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordingChunksRef = useRef<Blob[]>([]);
-  const recordingStreamRef = useRef<MediaStream | null>(null);
-  const storageKey = `life-regime:daily-log:${selectedDate}`;
+  const storageKey = draftStorageKey ?? `life-regime:daily-log:${selectedDate}`;
 
   useEffect(() => {
     loaded.current = false;
@@ -123,17 +117,6 @@ export function DailyLogForm({
       .then(setAvailableTags)
       .catch(() => undefined);
     return () => requestController.abort();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      const recorder = mediaRecorderRef.current;
-      if (recorder?.state === "recording") {
-        recorder.onstop = null;
-        recorder.stop();
-      }
-      stopRecordingStream();
-    };
   }, []);
 
   useEffect(() => {
@@ -218,91 +201,6 @@ export function DailyLogForm({
     update({ sleepIntentClickedAt: new Date().toISOString() });
   }
 
-  function stopRecordingStream() {
-    recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
-    recordingStreamRef.current = null;
-  }
-
-  async function startRecording() {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setRecordingError("Recording is not supported in this browser.");
-      return;
-    }
-
-    try {
-      setRecordingError("");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = getSupportedAudioMimeType();
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      recordingChunksRef.current = [];
-      recordingStreamRef.current = stream;
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          recordingChunksRef.current.push(event.data);
-        }
-      };
-      recorder.onerror = () => {
-        setRecordingError("Recording failed. Please try again.");
-        setIsRecording(false);
-        stopRecordingStream();
-      };
-      recorder.onstop = () => {
-        const type = recorder.mimeType || mimeType || "audio/webm";
-        const blob = new Blob(recordingChunksRef.current, { type });
-        if (!blob.size) {
-          setRecordingError("No audio was captured. Please try again.");
-          setIsRecording(false);
-          stopRecordingStream();
-          return;
-        }
-        const file = new File([blob], `recording-${new Date().toISOString().replace(/[:.]/g, "-")}.${audioExtension(type)}`, { type });
-        setAudioFile(file);
-        setAudioFileName(file.name);
-        setIsRecording(false);
-        stopRecordingStream();
-        void transcribeFile(file);
-      };
-
-      recorder.start();
-      setIsRecording(true);
-      update({ transcriptionStatus: "idle" });
-    } catch (error) {
-      setRecordingError("Microphone access was blocked or unavailable.");
-      setIsRecording(false);
-      stopRecordingStream();
-    }
-  }
-
-  function stopRecording() {
-    const recorder = mediaRecorderRef.current;
-    if (recorder?.state === "recording") {
-      recorder.stop();
-    }
-  }
-
-  async function transcribeSelectedAudio() {
-    if (!audioFile) return;
-    await transcribeFile(audioFile);
-  }
-
-  async function transcribeFile(file: File) {
-    setTranscriptionError("");
-    update({ transcriptionStatus: "uploading" });
-    try {
-      update({ transcriptionStatus: "transcribing" });
-      const transcript = await transcribeAudio(file);
-      update({
-        voiceTranscript: transcript,
-        transcriptionStatus: "done"
-      });
-    } catch (error) {
-      setTranscriptionError(error instanceof Error ? error.message : "Transcription failed.");
-      update({ transcriptionStatus: "error" });
-    }
-  }
-
   const autosaveLabel = useMemo(() => {
     if (saveState === "Saving...") return "Saving...";
     if (!lastSavedAt) return saveState;
@@ -362,13 +260,21 @@ export function DailyLogForm({
           />
           <ToggleField label="Training done" value={log.trainingDone} onChange={(trainingDone) => update({ trainingDone })} />
           <div>
-            <FieldLabel>Optional summary</FieldLabel>
+            <FieldLabel>{locale === "fr" ? "Résumé facultatif" : "Optional summary"}</FieldLabel>
             <TextArea
               value={log.textSummary}
               onChange={(event) => update({ textSummary: event.target.value })}
               className="mt-2 min-h-24"
-              placeholder="One sentence is enough."
+              placeholder={locale === "fr" ? "Écris ou dicte ton résumé." : "Write or dictate your summary."}
             />
+            <SummaryRecorder key={selectedDate} locale={locale} disabled={!loaded.current || log.date !== selectedDate}
+              onTranscript={(transcript) => {
+                if (activeDateRef.current !== selectedDate) return;
+                setLog((current) => sanitizeDailyLogDraft({ ...current,
+                  textSummary: appendSummaryTranscript(current.textSummary, transcript),
+                  voiceTranscript: transcript, transcriptionStatus: "done"
+                }));
+              }} />
           </div>
           <div className="space-y-4 border-t border-line pt-4">
             <p className="text-sm font-semibold text-ink">{copy.reflection}</p>
@@ -399,57 +305,6 @@ export function DailyLogForm({
             />
             <TagsField value={log.tags} onChange={(tags) => update({ tags })} tags={availableTags} label={copy.tags} placeholder={copy.addTag} removeTagLabel={(name) => copy.removeTag.replace("{name}", name)} />
             <CustomFieldsEditor value={log.customFields} onChange={(customFields) => update({ customFields })} />
-          </div>
-
-          <div>
-            <FieldLabel>Voice transcript placeholder</FieldLabel>
-            <TextArea
-              value={log.voiceTranscript}
-              onChange={(event) => update({ voiceTranscript: event.target.value })}
-              className="mt-2 min-h-20"
-              placeholder="Whisper transcription will land here later."
-            />
-            <input
-              ref={audioInputRef}
-              type="file"
-              accept="audio/*"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0] ?? null;
-                setAudioFile(file);
-                setAudioFileName(file?.name ?? "");
-                if (file) update({ transcriptionStatus: "idle" });
-              }}
-            />
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted">
-              <IconButton
-                type="button"
-                onClick={() => audioInputRef.current?.click()}
-                title="Pick an audio file"
-                disabled={isRecording}
-              >
-                <Mic className="h-4 w-4" />
-                {audioFileName ? "Replace audio" : "Upload audio"}
-              </IconButton>
-              <IconButton
-                type="button"
-                onClick={isRecording ? stopRecording : startRecording}
-                className={isRecording ? "border-risk/50 text-risk hover:border-risk hover:text-risk" : ""}
-              >
-                {isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                {isRecording ? "Stop recording" : "Start recording"}
-              </IconButton>
-              <IconButton
-                type="button"
-                onClick={transcribeSelectedAudio}
-                disabled={!audioFile || isRecording || log.transcriptionStatus === "uploading" || log.transcriptionStatus === "transcribing"}
-              >
-                {log.transcriptionStatus === "uploading" || log.transcriptionStatus === "transcribing" ? "Working..." : "Transcribe"}
-              </IconButton>
-              <span>Transcription: {isRecording ? "recording" : log.transcriptionStatus}</span>
-              {recordingError ? <span className="text-risk">{recordingError}</span> : null}
-              {transcriptionError ? <span className="text-risk">{transcriptionError}</span> : null}
-            </div>
           </div>
 
           <div className="border-t border-line pt-4">
@@ -714,19 +569,6 @@ function CustomFieldsEditor({
       </div>
     </div>
   );
-}
-
-function getSupportedAudioMimeType() {
-  if (typeof MediaRecorder === "undefined") return "";
-  return ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"].find((type) =>
-    MediaRecorder.isTypeSupported(type)
-  ) ?? "";
-}
-
-function audioExtension(mimeType: string) {
-  if (mimeType.includes("ogg")) return "ogg";
-  if (mimeType.includes("mp4")) return "m4a";
-  return "webm";
 }
 
 const RATIO_TONES = {

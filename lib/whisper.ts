@@ -2,7 +2,7 @@ import { expectJsonObject, expectString, requestJson } from "@/lib/http/apiClien
 
 export type TranscriptionStatus = "idle" | "uploading" | "transcribing" | "done" | "error";
 
-export async function transcribeAudio(file: File): Promise<string> {
+export async function transcribeAudio(file: File, signal?: AbortSignal): Promise<string> {
   const formData = new FormData();
   formData.set("file", file);
 
@@ -15,6 +15,7 @@ export async function transcribeAudio(file: File): Promise<string> {
     {
       method: "POST",
       body: formData,
+      signal,
       timeoutMs: 190_000
     }
   );

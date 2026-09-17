@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
-import { CheckSquare, CalendarDays, Target, TrendingUp, Settings, Plus } from "lucide-react";
+import { CheckSquare, CalendarDays, Target, TrendingUp, Settings, Plus, NotebookPen } from "lucide-react";
 import { Drawer, PrimaryButton, SecondaryButton, TextInput, FieldLabel } from "@/components/ui";
 import { AppearanceControl } from "@/features/interface/components/AppearanceControl";
 import { TodoClient } from "@/features/todo/components/TodoClient";
@@ -12,16 +12,19 @@ import type { ObjectivesData } from "@/features/objectives/domain/objective";
 import { getIsoWeekId, toDateKey } from "@/lib/dates";
 import { requestJson, expectJsonObject } from "@/lib/http/apiClient";
 import { connectApi } from "./nativeTransport";
-import { normalizeServerAddress } from "./serverAddress";
+import { normalizeConfiguredServerAddress } from "./serverConnection";
 import { captureTask, configureCaptures, disableQuickNotification, enableQuickNotification, listCaptures, syncCaptures, waitForCaptureSync } from "./quickCapture";
 
-type Page = "todo" | "funnel" | "objectives" | "performance" | "settings";
+const MobileDailyLog = lazy(() => import("./MobileDailyLog"));
+
+type Page = "logs" | "todo" | "funnel" | "objectives" | "performance" | "settings";
 const SERVER_STORAGE_KEY = "life-regime:server";
 const navigation = [
   { id: "todo", title: "Tâches", icon: CheckSquare },
   { id: "funnel", title: "Planning", icon: CalendarDays },
   { id: "objectives", title: "Objectifs", icon: Target },
   { id: "performance", title: "Capital", icon: TrendingUp },
+  { id: "logs", title: "Logs", icon: NotebookPen },
   { id: "settings", title: "Réglages", icon: Settings }
 ] as const;
 
@@ -84,7 +87,7 @@ export function MobileApp() {
     let connected = false;
     try {
       await waitForCaptureSync();
-      const origin = normalizeServerAddress(serverDraft);
+      const origin = normalizeConfiguredServerAddress(serverDraft);
       connectApi(origin);
       await requestJson("/api/auth/login", (payload) => {
         if (expectJsonObject(payload).ok !== true) throw new Error("Connexion refusée.");
@@ -133,6 +136,7 @@ export function MobileApp() {
       {ready && page === "funnel" ? <TodoClient key={`funnel-${revision}`} today={toDateKey()} initialView="funnel" /> : null}
       {ready && page === "objectives" ? <MobileObjectives key={revision} /> : null}
       {ready && page === "performance" ? <PerformanceClient key={revision} /> : null}
+      {ready && page === "logs" ? <Suspense fallback={<p role="status">Chargement du journal…</p>}><MobileDailyLog key={server} server={server} /></Suspense> : null}
       {page === "settings" ? <section className="space-y-5">
         <h1 className="text-xl font-semibold">Mon téléphone</h1>
         <AppearanceControl />
@@ -140,6 +144,7 @@ export function MobileApp() {
         <form onSubmit={(event) => void login(event)} className="space-y-3 rounded-2xl bg-panel p-4">
           <h2 className="font-semibold">Connexion à mes données</h2><p className="text-sm text-muted">Indique l’adresse de ton API personnelle et ta clé d’accès habituelle. Le téléphone et le web partageront les mêmes tâches, objectifs et performances.</p>
           <FieldLabel>Adresse du serveur<TextInput type="url" required placeholder="http://192.168.1.20:8000" value={serverDraft} onChange={(event) => setServerDraft(event.target.value)} /></FieldLabel>
+          {serverDraft.trim().startsWith("http://") ? <p className="text-xs text-muted">Connexion HTTP non chiffrée : la clé d’accès, les données et les enregistrements audio transitent sans chiffrement.</p> : null}
           <FieldLabel>Clé d’accès<TextInput type="password" required autoComplete="current-password" value={accessKey} onChange={(event) => setAccessKey(event.target.value)} /></FieldLabel>
           <PrimaryButton disabled={busy} type="submit">{busy ? "Connexion…" : "Connecter"}</PrimaryButton>
           <p className="text-xs text-muted">En Wi-Fi, utilise l’IP locale du PC ; 127.0.0.1 désigne le téléphone. L’API doit rester accessible pour consulter et modifier les données synchronisées.</p>
