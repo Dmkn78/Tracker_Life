@@ -34,4 +34,4 @@ git rev-parse HEAD
 
 Si des changements locaux ou une divergence empêchent le pull, les examiner avant de continuer ; ne pas utiliser de reset ou de push forcé. Mettre à jour Git ne reconstruit pas l’application et ne redémarre pas les services.
 
-La procédure complète Ubuntu reste dans le README. Le script `scripts/deploy.sh` est destiné à une installation existante avec les services `life-api` et `life-web`, les environnements privés et la base configurés. Son exécution sur le VPS est distincte du merge GitHub. Le déploiement automatique pourra être relié au serveur lorsque son accès aura été configuré explicitement.
+La procédure complète Ubuntu reste dans le README. Le script `scripts/deploy.sh` est destiné à une installation existante avec les services `interface-api-backend` et `life-web` (remplaçables par `API_SERVICE` et `WEB_SERVICE`), les environnements privés et la base configurés. Son exécution sur le VPS est distincte du merge GitHub. Le déploiement automatique pourra être relié au serveur lorsque son accès aura été configuré explicitement.

@@ -14,7 +14,7 @@
     "test:appearance": "node --experimental-strip-types --test features/interface/domain/appearance.test.mjs",
     "test:todo": "node --experimental-strip-types --test features/todo/domain/todoTask.test.mjs features/todo/domain/todoPlanning.test.mjs features/todo/domain/funnelPlanning.test.mjs",
     "test:habits": "node --experimental-strip-types --test features/habits/domain/habitSchedule.test.mjs",
-    "test:daily-log": "node --experimental-strip-types --test features/daily-log/domain/workRatio.test.mjs",
+    "test:daily-log": "node --experimental-strip-types --test features/daily-log/domain/workRatio.test.mjs features/daily-log/domain/summaryTranscript.test.mjs",
     "test:emotional": "node --experimental-strip-types --test features/emotional/domain/emotionalReview.test.mjs",
     "test:calendar": "node --experimental-strip-types --test features/calendar/domain/calendarLayers.test.mjs",
     "test:time-allocation": "node --experimental-strip-types --test features/time-allocation/domain/allocationPeriod.test.mjs features/time-allocation/domain/timeAllocationParser.test.mjs",

@@ -76,7 +76,7 @@ Documentation OpenAPI : `http://127.0.0.1:8000/docs`.
 | `GET` | `/api/history` | historique agrégé |
 | `GET` | `/api/reports/week` | export hebdomadaire |
 | `GET` | `/api/life-terminal` | read model du terminal |
-| `POST` | `/api/transcribe` | relais authentifié vers Whisper |
+| `POST` | `/api/transcribe` | transcription authentifiée via Parakeet V3 local |
 
 Toutes les routes sauf health et login exigent normalement une session ; logout peut effacer un cookie sans session valide.
 

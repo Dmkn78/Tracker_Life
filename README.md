@@ -2,11 +2,11 @@
 
 Life Regime Tracker est une application personnelle de suivi quotidien. Elle réunit journal de journée, tâches, calendrier, habitudes, objectifs, allocation du temps, historique, indicateurs de trajectoire et transcription vocale locale.
 
-Le projet est organisé en quatre processus ou services :
+Le projet utilise les composants suivants :
 
 - l’interface web Next.js/React sur le port `3000` ;
 - l’API métier FastAPI sur le port `8000` ;
-- le service local Whisper sur le port `8001` ;
+- un processus local Parakeet V3 multilingue lancé par l’API pour chaque transcription ;
 - PostgreSQL sur le port `5432`.
 
 ## GitHub et production Ubuntu
@@ -57,7 +57,7 @@ L’application aura quatre services :
 
 - Next.js/React sur `127.0.0.1:3000` ;
 - FastAPI sur `127.0.0.1:8000` ;
-- Whisper sur `127.0.0.1:8001` ;
+- Parakeet V3, lancé à la demande sans port supplémentaire ;
 - PostgreSQL sur `127.0.0.1:5432`.
 
 Nginx recevra les visiteurs sur Internet et redirigera vers Next.js. Les ports internes `3000`, `8000`, `8001` et `5432` ne doivent pas être ouverts publiquement.
@@ -266,40 +266,19 @@ Tu dois voir une réponse proche de :
 
 Arrête le serveur de test avec `Ctrl+C`.
 
-### 7. Installer les dépendances Python de Whisper
+### 7. Installer Parakeet V3 multilingue
 
-Whisper peut être lourd sur un petit VPS. Le modèle `tiny` est le plus léger. Sur un VPS sans GPU, la transcription peut être lente.
-
-```bash
-cd /opt/life-regime-tracker/services
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-deactivate
-```
-
-Teste Whisper :
+Depuis la racine du dépôt, avec Python 3.12 ou plus récent :
 
 ```bash
-cd /opt/life-regime-tracker
-source services/.venv/bin/activate
-uvicorn services.whisper_service:app --host 127.0.0.1 --port 8001
+python3 scripts/install-parakeet.py
 ```
 
-Dans un deuxième terminal SSH :
+Le script crée `.runtime/parakeet-venv` et télécharge le modèle CPU quantifié, dont il vérifie le SHA256. Aucun service Whisper ni application de bureau Handy n’est nécessaire : l’API utilise directement le modèle Parakeet V3. Prévoir de la mémoire disponible pour l’inférence ; le processus se termine après chaque transcription.
 
-```bash
-curl http://127.0.0.1:8001/health
-```
+Dans les logs, **Dicter le résumé** démarre le microphone ; **Arrêter et transcrire** ajoute le texte au résumé existant. Le résumé reste facultatif. La durée est limitée à deux minutes et les fichiers à 25 Mo. L’import audio utilise le même modèle. Le microphone du navigateur nécessite HTTPS ou localhost et une autorisation de l’utilisateur.
 
-Tu dois voir :
-
-```json
-{"ok":true}
-```
-
-Arrête le serveur de test avec `Ctrl+C`.
+Les chemins peuvent être remplacés par `PARAKEET_PYTHON` et `PARAKEET_MODEL_DIR`. Le délai maximal utilise le réglage existant `WHISPER_TIMEOUT_SECONDS` (180 secondes par défaut).
 
 ### 8. Créer les services systemd
 
@@ -323,31 +302,6 @@ Type=simple
 WorkingDirectory=/opt/life-regime-tracker/interface_API
 EnvironmentFile=/opt/life-regime-tracker/interface_API/.env
 ExecStart=/opt/life-regime-tracker/interface_API/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Crée le service Whisper :
-
-```bash
-nano /etc/systemd/system/life-whisper.service
-```
-
-Colle ceci :
-
-```ini
-[Unit]
-Description=Life Regime Tracker Whisper Service
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=/opt/life-regime-tracker
-EnvironmentFile=/opt/life-regime-tracker/.env
-ExecStart=/opt/life-regime-tracker/services/.venv/bin/uvicorn services.whisper_service:app --host 127.0.0.1 --port 8001
 Restart=always
 RestartSec=5
 
@@ -396,9 +350,8 @@ Active et lance les services :
 
 ```bash
 systemctl daemon-reload
-systemctl enable life-api life-whisper life-web
+systemctl enable life-api life-web
 systemctl start life-api
-systemctl start life-whisper
 systemctl start life-web
 ```
 
@@ -406,7 +359,6 @@ Vérifie leur état :
 
 ```bash
 systemctl status life-api
-systemctl status life-whisper
 systemctl status life-web
 ```
 
@@ -432,6 +384,7 @@ server {
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
+        proxy_read_timeout 200s;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -498,17 +451,10 @@ Voir les logs de l’API FastAPI :
 journalctl -u life-api -f
 ```
 
-Voir les logs du service Whisper :
-
-```bash
-journalctl -u life-whisper -f
-```
-
 Redémarrer après une modification :
 
 ```bash
 systemctl restart life-api
-systemctl restart life-whisper
 systemctl restart life-web
 ```
 
@@ -522,7 +468,6 @@ pnpm prisma generate
 pnpm prisma migrate deploy
 pnpm build
 systemctl restart life-api
-systemctl restart life-whisper
 systemctl restart life-web
 ```
 
@@ -531,7 +476,6 @@ Tester les ports internes :
 ```bash
 curl http://127.0.0.1:3000
 curl http://127.0.0.1:8000/api/health
-curl http://127.0.0.1:8001/health
 ```
 
 ### 12. Pare-feu minimal
@@ -546,7 +490,7 @@ ufw enable
 ufw status
 ```
 
-N’ouvre pas PostgreSQL, FastAPI ou Whisper sur Internet. Ils doivent rester en local sur `127.0.0.1`.
+N’ouvre pas PostgreSQL ou FastAPI sur Internet. Ils doivent rester en local sur `127.0.0.1`.
 
 ### 13. Problèmes fréquents
 
@@ -564,11 +508,11 @@ curl http://127.0.0.1:8000/api/health
 journalctl -u life-api -n 100
 ```
 
-Si la transcription vocale ne fonctionne pas, vérifie Whisper :
+Si la transcription vocale ne fonctionne pas, vérifie les logs de l’API et l’installation de Parakeet :
 
 ```bash
-curl http://127.0.0.1:8001/health
-journalctl -u life-whisper -n 100
+journalctl -u life-api -n 100
+python3 scripts/install-parakeet.py
 ```
 
 Si la base de données refuse la connexion, vérifie `DATABASE_URL` dans `.env` et `interface_API/.env`, puis teste :
@@ -580,7 +524,7 @@ psql "postgresql://life_user:REMPLACE_PAR_UN_MOT_DE_PASSE_LONG@127.0.0.1:5432/li
 Si tu changes une variable d’environnement, redémarre les services :
 
 ```bash
-systemctl restart life-api life-whisper life-web
+systemctl restart life-api life-web
 ```
 
 ## Android — Life Regime
