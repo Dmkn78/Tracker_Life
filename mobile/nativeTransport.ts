@@ -19,7 +19,7 @@ export function connectApi(server: string): void {
     const request = CapacitorHttp.request({
       url, method: options.method ?? "GET", headers,
       data, dataType: isAudioUpload ? "formData" : undefined,
-      responseType: "text", connectTimeout: 15000, readTimeout: isAudioUpload ? 190000 : 15000,
+      responseType: "text", connectTimeout: 15000, readTimeout: isAudioUpload ? 610000 : 15000,
       disableRedirects: true
     });
     // Native HTTP has bounded timeouts but cannot be cancelled at the socket level.

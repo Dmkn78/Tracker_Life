@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import os
+import signal
 from pathlib import Path
 import tempfile
 
@@ -42,7 +43,7 @@ async def transcribe(file: UploadFile = File(...), user: User = Depends(get_curr
     return result
 
 
-async def run_parakeet(audio_path: Path) -> dict[str, str]:
+async def run_parakeet(audio_path: Path, progress_file: Path | None = None) -> dict[str, str]:
     runtime = REPOSITORY_ROOT / ".runtime"
     python_name = "Scripts/python.exe" if os.name == "nt" else "bin/python"
     python = Path(os.environ.get("PARAKEET_PYTHON", str(runtime / "parakeet-venv" / python_name)))
@@ -53,21 +54,28 @@ async def run_parakeet(audio_path: Path) -> dict[str, str]:
     try:
         process = await asyncio.create_subprocess_exec(
             str(python), str(REPOSITORY_ROOT / "services" / "parakeet_worker.py"), str(audio_path),
-            env={**os.environ, "PARAKEET_MODEL_DIR": str(model), "OMP_NUM_THREADS": "2"},
+            env={**os.environ, "PARAKEET_MODEL_DIR": str(model), "OMP_NUM_THREADS": "2", **({"PARAKEET_PROGRESS_FILE": str(progress_file)} if progress_file else {})},
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            start_new_session=os.name != "nt",
         )
     except OSError as error:
         raise HTTPException(status_code=503, detail="Parakeet V3 could not start") from error
     try:
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=get_settings().whisper_timeout_seconds)
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=3600 if progress_file else get_settings().whisper_timeout_seconds)
     except TimeoutError as error:
         raise HTTPException(status_code=504, detail="Transcription timed out. Try a shorter recording.") from error
     finally:
         if process.returncode is None:
-            process.kill()
+            try:
+                if os.name != "nt" and getattr(process, "pid", None):
+                    os.killpg(process.pid, signal.SIGKILL)
+                else:
+                    process.kill()
+            except ProcessLookupError:
+                pass
             await process.communicate()
     if process.returncode == 2:
-        raise HTTPException(status_code=422, detail="Audio is invalid or exceeds the 2 minute limit")
+        raise HTTPException(status_code=422, detail="Audio is invalid or exceeds the 30 minute limit")
     if process.returncode != 0:
         logger.error("Parakeet worker exited with status %s", process.returncode)
         raise HTTPException(status_code=503, detail="Parakeet V3 transcription failed. Please retry.")
