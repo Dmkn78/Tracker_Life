@@ -47,4 +47,10 @@ public final class QuickCaptureStore extends SQLiteOpenHelper {
     public void acknowledge(String id, String scope) {
         getWritableDatabase().delete("captures", "id = ? AND scope = ?", new String[]{id, scope});
     }
+
+    public int pendingCount(String scope) {
+        try (Cursor cursor = getReadableDatabase().rawQuery("SELECT COUNT(*) FROM captures WHERE scope = ?", new String[]{scope})) {
+            return cursor.moveToFirst() ? cursor.getInt(0) : 0;
+        }
+    }
 }

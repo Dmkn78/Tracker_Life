@@ -11,7 +11,6 @@ body { overscroll-behavior-y: contain; }
   .mobile-content h2 { font-size: 1.12rem; }
   .mobile-content section { padding: 12px; }
   .mobile-content .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 16px; }
-  .mobile-content .grid.md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-  .mobile-content .grid.md\:grid-cols-3 > div { padding: 10px; }
-  .mobile-content .grid.md\:grid-cols-3 .text-3xl { font-size: 1.3rem; }
+  .mobile-content h1 { font-size: 1.5rem; }
+  .mobile-content .font-mono { overflow-wrap: anywhere; }
 }

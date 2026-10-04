@@ -55,7 +55,11 @@ export async function requestJson<T>(
     }
 
     try {
-      return parser(payload);
+      const parsed = parser(payload);
+      if (typeof window !== "undefined" && requestOptions.method && !["GET", "HEAD"].includes(requestOptions.method.toUpperCase())) {
+        window.dispatchEvent(new Event("life-regime:api-write"));
+      }
+      return parsed;
     } catch (cause: unknown) {
       throw new ApiError("The API returned an invalid response.", response.status, cause);
     }

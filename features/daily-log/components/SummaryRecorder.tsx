@@ -10,6 +10,7 @@ type SummaryRecorderProps = {
   locale: "fr" | "en";
   disabled: boolean;
   onTranscript: (text: string) => void;
+  onBusyChange?: (busy: boolean) => void;
 };
 const MAX_RECORDING_SECONDS = 30 * 60;
 const MAX_AUDIO_BYTES = 100 * 1024 * 1024;
@@ -37,7 +38,7 @@ const COPY = {
   }
 };
 
-export function SummaryRecorder({ locale, disabled, onTranscript }: SummaryRecorderProps) {
+export function SummaryRecorder({ locale, disabled, onTranscript, onBusyChange }: SummaryRecorderProps) {
   const copy = COPY[locale];
   const [state, setState] = useState<RecordingState>("idle");
   const [progress, setProgress] = useState(0);
@@ -53,6 +54,12 @@ export function SummaryRecorder({ locale, disabled, onTranscript }: SummaryRecor
   const busyRef = useRef(false);
   const onTranscriptRef = useRef(onTranscript);
   onTranscriptRef.current = onTranscript;
+
+  useEffect(() => {
+    onBusyChange?.(state !== "idle");
+  }, [state, onBusyChange]);
+
+  useEffect(() => () => { onBusyChange?.(false); }, [onBusyChange]);
 
   function releaseMicrophone() {
     clearInterval(timerRef.current);
@@ -189,7 +196,7 @@ export function SummaryRecorder({ locale, disabled, onTranscript }: SummaryRecor
   return <div className="mt-2 space-y-2">
     <div className="flex flex-wrap items-center gap-2">
       <IconButton type="button" onClick={isRecording ? () => { if (recorderRef.current?.state === "recording") recorderRef.current.stop(); } : startRecording}
-        disabled={disabled || (isBusy && !isRecording)} aria-pressed={isRecording}
+        disabled={!isRecording && (disabled || isBusy)} aria-pressed={isRecording}
         className={isRecording ? "border-risk/50 text-risk" : ""}>
         {isRecording ? <Square className="h-4 w-4 fill-current" /> : isBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
         {isRecording ? copy.stop : state === "requesting" ? copy.requesting : state === "uploading" ? copy.uploading : state === "transcribing" ? copy.transcribing : copy.start}

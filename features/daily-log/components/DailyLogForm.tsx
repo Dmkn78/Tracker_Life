@@ -41,6 +41,7 @@ import {
 import { formatDisplayDate } from "@/lib/dates";
 import { SummaryRecorder } from "./SummaryRecorder";
 import { appendSummaryTranscript } from "@/features/daily-log/domain/summaryTranscript";
+import { AssistantPanel } from "@/features/assistant/components/AssistantPanel";
 
 export function DailyLogForm({
   selectedDate,
@@ -65,6 +66,7 @@ export function DailyLogForm({
   const [recordCreatedAt, setRecordCreatedAt] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+  const [isSummaryRecorderBusy, setIsSummaryRecorderBusy] = useState(false);
   const loaded = useRef(false);
   const activeDateRef = useRef(selectedDate);
   const pendingAutosaveTimerRef = useRef<number | null>(null);
@@ -241,6 +243,22 @@ export function DailyLogForm({
         </div>
       </div>
 
+      <div className="mb-4">
+        <AssistantPanel key={selectedDate} date={selectedDate} initialMode="day"
+          disabled={!loaded.current || log.date !== selectedDate || isSummaryRecorderBusy}
+          beforePreview={async () => {
+            cancelPendingAutosave();
+            const wasSaved = await enqueueSave(log, "draft", "Saved for analysis");
+            if (!wasSaved) throw new Error(locale === "fr" ? "Enregistre la journée avant de l’analyser : la sauvegarde a échoué." : "Save the day before analysis: saving failed.");
+          }}
+          onTasksCreated={async () => {
+            const response = await loadDailyLog(selectedDate);
+            if (activeDateRef.current !== selectedDate) return;
+            setMetrics(response.todoMetrics);
+            setScores(response.log);
+          }} />
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.8fr)]">
         <Panel className="space-y-5">
           <SliderField label="Energy" value={log.energy} onChange={(energy) => update({ energy })} />
@@ -268,6 +286,7 @@ export function DailyLogForm({
               placeholder={locale === "fr" ? "Écris ou dicte ton résumé." : "Write or dictate your summary."}
             />
             <SummaryRecorder key={selectedDate} locale={locale} disabled={!loaded.current || log.date !== selectedDate}
+              onBusyChange={setIsSummaryRecorderBusy}
               onTranscript={(transcript) => {
                 if (activeDateRef.current !== selectedDate) return;
                 setLog((current) => sanitizeDailyLogDraft({ ...current,

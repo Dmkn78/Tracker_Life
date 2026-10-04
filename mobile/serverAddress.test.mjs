@@ -14,12 +14,16 @@ test("rejects public cleartext, credentials, paths and alternate protocols", () 
   }
 });
 
-test("allows only the explicitly configured VPS HTTP origin", () => {
-  const personalOrigin = "http://203.0.113.10";
-  assert.equal(normalizeServerAddress(personalOrigin + "/", personalOrigin), personalOrigin);
-  for (const other of ["http://203.0.113.11", "http://203.0.113.10:8000", "http://203.0.113.10.example.com", "http://203.0.113.10@other.example.com"]) {
-    assert.throws(() => normalizeServerAddress(other, personalOrigin));
+test("public HTTP is accepted only after explicit selection, including a custom port", () => {
+  assert.throws(() => normalizeServerAddress("http://203.0.113.10:3000"), /Autoriser HTTP/);
+  assert.equal(normalizeServerAddress(" http://203.0.113.10:3000/ ", "allow-http"), "http://203.0.113.10:3000");
+  assert.equal(normalizeServerAddress("http://life.example.com", "allow-http"), "http://life.example.com");
+  assert.equal(normalizeServerAddress("https://life.example.com", "allow-http"), "https://life.example.com");
+  for (const url of ["http://user:pass@life.example.com", "http://life.example.com/api", "http://life.example.com?key=secret", "ftp://life.example.com"]) {
+    assert.throws(() => normalizeServerAddress(url, "allow-http"));
   }
-  assert.throws(() => normalizeServerAddress(personalOrigin));
-  assert.throws(() => normalizeServerAddress("http://public.example.com", "http://public.example.com"));
+});
+
+test("missing protocol receives an actionable address error", () => {
+  assert.throws(() => normalizeServerAddress("203.0.113.10"), /http:\/\/ ou https:\/\//);
 });

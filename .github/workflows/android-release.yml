@@ -1,0 +1,110 @@
+name: Publish Android release
+
+on:
+  workflow_call:
+    secrets:
+      ANDROID_KEYSTORE_BASE64:
+        required: true
+      ANDROID_KEYSTORE_PASSWORD:
+        required: true
+      ANDROID_KEY_ALIAS:
+        required: true
+      ANDROID_KEY_PASSWORD:
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, verify and publish APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Install Android SDK 36
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Restore persistent Android signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-release.keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          for signing_variable in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!signing_variable}" ]; then
+              echo "::error::Missing repository secret ${signing_variable}. Use the same signing key as the installed Android app."
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          printf 'ANDROID_KEYSTORE_PATH=%s\n' "$ANDROID_KEYSTORE_PATH" >> "$GITHUB_ENV"
+      - name: Assign increasing Android version code
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          const versionCode = Math.floor((Date.now() - Date.UTC(2020, 0, 1)) / 1000);
+          if (versionCode < 10 || versionCode > 2100000000) throw new Error('Android version code is outside the supported range.');
+          appendFileSync(process.env.GITHUB_ENV, `ANDROID_VERSION_CODE=${versionCode}\n`);
+          NODE
+      - name: Build and synchronize mobile application
+        env:
+          NEXT_PUBLIC_WEBSITE_VERSION: ${{ github.sha }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build:mobile
+          pnpm exec cap sync android
+      - name: Build signed release APK
+        working-directory: android
+        run: bash gradlew --no-daemon :app:assembleRelease
+      - name: Verify APK signature
+        run: '"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose android/app/build/outputs/apk/release/app-release.apk'
+      - name: Prepare Android update manifest
+        run: node scripts/package-android-release.mjs .runtime/github-android-release release
+      - name: Publish complete GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_tag=$(node --input-type=module -e "import { readFileSync } from 'node:fs'; const release = JSON.parse(readFileSync('.runtime/github-android-release/release.json', 'utf8')); console.log('android-v' + release.version + '-' + release.versionCode);")
+          release_version=$(node --input-type=module -e "import { readFileSync } from 'node:fs'; console.log(JSON.parse(readFileSync('.runtime/github-android-release/release.json', 'utf8')).version);")
+          printf 'Application Android Life Regime %s.\n\nCommit : %s\n\nTéléchargement et installation depuis le panneau Application Android sur le téléphone.\n' "$release_version" "$GITHUB_SHA" > "$RUNNER_TEMP/android-release-notes.md"
+          gh release create "$release_tag" .runtime/github-android-release/release.json .runtime/github-android-release/*.apk \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Life Regime Android $release_version ($ANDROID_VERSION_CODE)" \
+            --notes-file "$RUNNER_TEMP/android-release-notes.md" --draft
+          gh release edit "$release_tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          printf 'Android %s (%s) publié : [%s](https://github.com/%s/releases/tag/%s)\n' "$release_version" "$ANDROID_VERSION_CODE" "$release_tag" "$GITHUB_REPOSITORY" "$release_tag" >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove temporary signing key
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "${ANDROID_KEYSTORE_PATH:-}" ]; then
+            rm -f -- "$ANDROID_KEYSTORE_PATH"
+          fi

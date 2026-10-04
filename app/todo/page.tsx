@@ -1,13 +1,14 @@
 import { AppShell } from "@/components/AppShell";
 import { requireUser } from "@/lib/auth";
 import { toDateKey } from "@/lib/dates";
-import { TodoClient } from "@/features/todo/components/TodoClient";
+import { WebsiteTodoClient } from "@/features/todo/components/WebsiteTodoClient";
 
-export default async function TodoPage() {
-  await requireUser();
+export default async function TodoPage({ searchParams }: { searchParams: Promise<{ create?: string }> }) {
+  const createToday = (await searchParams).create === "today";
+  await requireUser(createToday ? "/todo?create=today" : undefined);
   return (
     <AppShell>
-      <TodoClient today={toDateKey()} />
+      <WebsiteTodoClient today={toDateKey()} createToday={createToday} />
     </AppShell>
   );
 }

@@ -1,26 +1,28 @@
 "use client";
 
-import { KeyRound, Lock, Palette } from "lucide-react";
+import { KeyRound, Lock } from "lucide-react";
 import { useState } from "react";
 import { FieldLabel, Panel, SelectInput, TextInput } from "@/components/ui";
-import { AppearanceSettingsControl } from "@/features/interface/components/AppearanceControl";
-import { LocaleControl } from "@/features/interface/components/LocaleControl";
+import { InterfaceSettingsPanel } from "./InterfaceSettingsPanel";
 import { useLocale } from "@/features/interface/localization/LocaleProvider";
 import { updateTrackingSettings } from "@/features/settings/api/settingsApi";
 import type { TrackingSettingsPatch } from "@/features/settings/domain/settings";
 import { ApiError } from "@/lib/http/apiClient";
 import { LogoutButton } from "./LogoutButton";
+import { AssistantSettingsPanel } from "@/features/assistant/components/AssistantSettingsPanel";
 
 type SaveState = "saved" | "saving" | "failed";
 
 export function SettingsClient({
   initialCalorieTarget,
   initialSleepDelay,
-  usingDevAccessKey
+  usingDevAccessKey,
+  interfaceSettings = "included"
 }: {
   initialCalorieTarget: number;
   initialSleepDelay: number;
   usingDevAccessKey: boolean;
+  interfaceSettings?: "included" | "external";
 }) {
   const { translate } = useLocale();
   const [calorieTarget, setCalorieTarget] = useState(initialCalorieTarget);
@@ -124,21 +126,9 @@ export function SettingsClient({
         </div>
       </Panel>
 
-      <Panel>
-        <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-md bg-violet/15 text-violet">
-            <Palette className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-ink">{translate("settings.appearanceTitle")}</h2>
-            <p className="mt-2 text-sm leading-6 text-muted">{translate("settings.appearanceDescription")}</p>
-            <div className="mt-4 space-y-4">
-              <AppearanceSettingsControl />
-              <LocaleControl />
-            </div>
-          </div>
-        </div>
-      </Panel>
+      {interfaceSettings === "included" ? <InterfaceSettingsPanel /> : null}
+
+      <AssistantSettingsPanel />
 
       <Panel>
         <h2 className="text-lg font-semibold text-ink">{translate("settings.session")}</h2>

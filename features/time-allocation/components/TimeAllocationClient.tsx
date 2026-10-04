@@ -46,10 +46,12 @@ const colors = ["#8da2fb", "#57c59a", "#f0c56b", "#f08b8f", "#76b2ff", "#9282ff"
 
 export function TimeAllocationClient({
   initialData,
-  hasExplicitSelection
+  hasExplicitSelection,
+  onSelectionChange
 }: {
   initialData: TimeAllocationData;
   hasExplicitSelection: boolean;
+  onSelectionChange?: (period: TimeAllocationPeriod, date: string) => void;
 }) {
   const { locale } = useLocale();
   const copy = TIME_ALLOCATION_COPY[locale];
@@ -127,10 +129,13 @@ export function TimeAllocationClient({
     if (mutationInFlightRef.current) return;
     const nextDate = canonicalAllocationAnchor(nextPeriod, requestedDate);
     window.localStorage.setItem("time-allocation:period", nextPeriod);
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set("period", nextPeriod);
-    nextUrl.searchParams.set("date", nextDate);
-    window.history.replaceState(window.history.state, "", nextUrl);
+    if (onSelectionChange) onSelectionChange(nextPeriod, nextDate);
+    else {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set("period", nextPeriod);
+      nextUrl.searchParams.set("date", nextDate);
+      window.history.replaceState(window.history.state, "", nextUrl);
+    }
     await load(nextPeriod, nextDate);
   }
 

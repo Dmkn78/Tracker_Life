@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 from .config import get_settings
 from .routers import (
+    assistant,
     auth,
     calendar_events,
     companies,
@@ -18,6 +19,7 @@ from .routers import (
     habits,
     history,
     life_terminal,
+    mobile_update,
     objectives,
     objective_planning,
     performance,
@@ -25,6 +27,7 @@ from .routers import (
     settings as settings_router,
     tags,
     tasks,
+    task_templates,
     thinking_notes,
     time_allocation,
     transcribe,
@@ -32,7 +35,6 @@ from .routers import (
 )
 
 logger = logging.getLogger(__name__)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -94,10 +96,12 @@ def health() -> dict[str, bool]:
 
 
 app.include_router(auth.router)
+app.include_router(assistant.router)
 app.include_router(objective_planning.router)
 app.include_router(daily_log.router)
 app.include_router(emotional_reviews.router)
 app.include_router(tasks.router)
+app.include_router(task_templates.router)
 app.include_router(calendar_events.router)
 app.include_router(habits.router)
 app.include_router(history.router)
@@ -107,8 +111,9 @@ app.include_router(settings_router.router)
 app.include_router(time_allocation.router)
 app.include_router(reports.router)
 app.include_router(transcribe.router)
-app.include_router(transcription_jobs.router)
 app.include_router(life_terminal.router)
+app.include_router(mobile_update.router)
+app.include_router(transcription_jobs.router)
 app.include_router(companies.router)
 app.include_router(tags.router)
 app.include_router(thinking_notes.router)

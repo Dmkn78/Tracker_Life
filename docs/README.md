@@ -66,6 +66,7 @@ Le parcours Todo est le meilleur fil rouge :
 | [`10-CARTE-DES-FICHIERS.md`](10-CARTE-DES-FICHIERS.md) | Quel est le rôle de chaque fichier important ? |
 | [`11-GLOSSAIRE.md`](11-GLOSSAIRE.md) | Quelle est la définition simple d’un terme ? |
 | [`whisper.md`](whisper.md) | Comment fonctionne la transcription locale ? |
+| [`lm-studio-assistant.md`](lm-studio-assistant.md) | Comment dicter des tâches et analyser mes journées avec LM Studio ? |
 
 ## État et limites connues
 

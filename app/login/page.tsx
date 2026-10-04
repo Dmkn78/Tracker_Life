@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LockKeyhole } from "lucide-react";
 import { PrimaryButton } from "@/components/ui";
 import { loginSession } from "@/features/auth/api/sessionApi";
+import { loginDestination } from "@/features/android/domain/websiteVersion";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,7 +19,7 @@ export default function LoginPage() {
     setError("");
     try {
       await loginSession(accessKey);
-      router.push("/");
+      router.push(loginDestination(new URLSearchParams(location.search).get("returnTo")));
       router.refresh();
     } catch {
       setError("Access key was not accepted.");

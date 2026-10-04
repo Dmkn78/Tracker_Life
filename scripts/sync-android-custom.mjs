@@ -6,11 +6,17 @@ const main = resolve(root, "android/app/src/main");
 await cp(resolve(root, "native/android"), main, { recursive: true });
 const manifestPath = resolve(main, "AndroidManifest.xml");
 let manifest = await readFile(manifestPath, "utf8");
-if (!manifest.includes("android.permission.POST_NOTIFICATIONS")) {
-  manifest = manifest.replace("<application", '<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <application');
+if (!manifest.includes("android.permission.MODIFY_AUDIO_SETTINGS")) {
+  manifest = manifest.replace("<application", '<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <application');
+}
+if (!manifest.includes("android.permission.REQUEST_INSTALL_PACKAGES")) {
+  manifest = manifest.replace("<application", '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n    <application');
 }
 if (!manifest.includes("android.permission.RECORD_AUDIO")) {
   manifest = manifest.replace("<application", '<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <application');
+}
+if (!manifest.includes("android.permission.POST_NOTIFICATIONS")) {
+  manifest = manifest.replace("<application", '<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <application');
 }
 if (!manifest.includes("android.permission.MODIFY_AUDIO_SETTINGS")) {
   manifest = manifest.replace("<application", '<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <application');

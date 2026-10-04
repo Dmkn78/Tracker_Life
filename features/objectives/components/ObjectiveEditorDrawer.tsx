@@ -1,6 +1,7 @@
 import type { FormEventHandler } from "react";
 import { Trash2 } from "lucide-react";
 import { Drawer, GhostButton, PrimaryButton, SecondaryButton } from "@/components/ui";
+import { useLocale } from "@/features/interface/localization/LocaleProvider";
 import type { ObjectiveSummary, ObjectiveTask } from "@/features/objectives/domain/objective";
 import type { ObjectiveDraft, WeeklyBlockDraft } from "@/features/objectives/domain/objectiveUi";
 import { ObjectiveForm, OBJECTIVE_FORM_ID } from "@/features/objectives/components/ObjectiveForm";
@@ -36,15 +37,16 @@ export function ObjectiveEditorDrawer({
   onSaveObjective,
   onSaveWeeklyBlock
 }: ObjectiveEditorDrawerProps) {
+  const { translate } = useLocale();
   const isObjectiveEditor = editor?.type === "objective";
   const isEditMode = editor?.mode === "edit";
   const formId = isObjectiveEditor ? OBJECTIVE_FORM_ID : WEEKLY_BLOCK_FORM_ID;
   const title = isObjectiveEditor
-    ? isEditMode ? "Edit objective" : "Add objective"
-    : isEditMode ? "Edit weekly block" : "Add weekly block";
+    ? translate(isEditMode ? "objectives.editor.edit" : "objectives.editor.create")
+    : translate(isEditMode ? "objectives.editor.editBlock" : "objectives.editor.createBlock");
   const description = isObjectiveEditor
-    ? "Keep strategy readable: one title, one next action, one horizon."
-    : "Plan only the blocks that genuinely matter this week.";
+    ? translate("objectives.editor.description")
+    : translate("objectives.editor.blockDescription");
   const isTitleMissing = editor ? !editor.draft.title.trim() : true;
 
   return (
@@ -59,15 +61,21 @@ export function ObjectiveEditorDrawer({
           {isEditMode ? (
             <GhostButton onClick={onDelete} className="rounded-2xl bg-risk/10 px-3 text-risk ring-1 ring-risk/15">
               <Trash2 className="h-4 w-4" />
-              Delete
+              {translate("objectives.editor.delete")}
             </GhostButton>
           ) : (
             <span />
           )}
           <div className="flex gap-2">
-            <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+            <SecondaryButton onClick={onClose}>{translate("objectives.editor.cancel")}</SecondaryButton>
             <PrimaryButton type="submit" form={formId} disabled={isSaving || isTitleMissing}>
-              {isSaving ? "Saving..." : isEditMode ? "Save" : "Create"}
+              {translate(isSaving
+                ? "objectives.editor.saving"
+                : isEditMode
+                  ? "objectives.editor.save"
+                  : isObjectiveEditor
+                    ? "objectives.editor.submit"
+                    : "objectives.editor.submitBlock")}
             </PrimaryButton>
           </div>
         </div>
@@ -75,6 +83,7 @@ export function ObjectiveEditorDrawer({
     >
       {editor?.type === "objective" ? (
         <ObjectiveForm
+          key={editor.draft.id ?? "new-objective"}
           draft={editor.draft}
           objectives={objectives}
           taskOptions={taskOptions}

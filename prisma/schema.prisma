@@ -114,6 +114,7 @@ model User {
   defaultSleepDelayMin Int      @default(20)
   dailyLogs     DailyLog[]
   tasks         Task[]
+  taskTemplates TaskTemplate[]
   events        CalendarEvent[]
   timeCategories TimeAllocationCategory[]
   timeAllocations DailyTimeAllocation[]
@@ -292,6 +293,7 @@ model Task {
   companyId         String?
   company           Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
   title             String
+  isDay             Boolean        @default(false)
   description       String?
   date              DateTime?      @db.Date
   startTime         String?
@@ -312,6 +314,18 @@ model Task {
   @@index([userId, objectiveId])
   @@index([userId, companyId])
   @@index([userId, sortOrder])
+}
+
+model TaskTemplate {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  fields    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
 }
 
 model TimeAllocationCategory {

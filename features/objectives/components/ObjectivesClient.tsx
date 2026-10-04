@@ -82,7 +82,9 @@ export function ObjectivesClient({ initialData }: ObjectivesClientProps) {
       mode: "create",
       draft: {
         ...defaultObjectiveDraft(),
-        parentId
+        parentId,
+        weekId,
+        targetDate: data.weekDays[6]
       }
     });
   }
@@ -281,7 +283,7 @@ export function ObjectivesClient({ initialData }: ObjectivesClientProps) {
       </div>
 
       <ObjectivePlanningWorkspace data={data} onRefresh={() => load()} onCreateBlock={openCreateBlock} onEditBlock={openEditBlock} onLogBlock={setExecutionBlock} onEditObjective={openEditObjective}
-        onMilestone={(parentId, date) => setDrawer({ type: "objective", mode: "create", draft: { ...defaultObjectiveDraft(), parentId, kind: "milestone", horizon: "week", targetDate: date } })}
+        onMilestone={(parentId, date) => setDrawer({ type: "objective", mode: "create", draft: { ...defaultObjectiveDraft(), parentId, kind: "milestone", horizon: "week", targetDate: date, weekId } })}
         overview={(inspect) => <div className="space-y-4"><div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <ObjectiveHierarchyPanel
           data={data}

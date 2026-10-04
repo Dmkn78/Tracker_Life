@@ -9,6 +9,11 @@ type CapturePlugin = {
   acknowledge(options: { id: string; scope: string }): Promise<void>;
   enableNotification(): Promise<{ enabled: boolean }>;
   disableNotification(): Promise<void>;
+  updateSummary(options: { scope: string; date: string; completed: number; total: number; titles?: string[] }): Promise<void>;
+  showTaskKeyboard(): Promise<void>;
+  notificationState(): Promise<{ enabled: boolean; permissionGranted: boolean }>;
+  summaryError(options: { scope: string; message: string }): Promise<void>;
+  openNotificationSettings(): Promise<void>;
 };
 const native = registerPlugin<CapturePlugin>("QuickCapture");
 const STORAGE_KEY = "life-regime:pending-captures";
@@ -71,6 +76,14 @@ export async function disableQuickNotification(): Promise<void> {
   if (Capacitor.isNativePlatform()) await native.disableNotification();
 }
 
+export async function updateNotificationSummary(scope: string, summary: { date: string; completed: number; total: number; titles?: string[] }): Promise<void> {
+  if (Capacitor.isNativePlatform()) await native.updateSummary({ scope, ...summary });
+}
+
+export async function showTaskKeyboard(): Promise<void> {
+  if (Capacitor.isNativePlatform()) await native.showTaskKeyboard();
+}
+
 function readBrowserCaptures(): PendingCapture[] {
   const entries: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
   if (!Array.isArray(entries)) throw new Error("Le stockage des captures est illisible.");
@@ -79,4 +92,14 @@ function readBrowserCaptures(): PendingCapture[] {
     if (typeof record.createdAt !== "number") throw new Error("Invalid capture date");
     return { id: expectString(record.id, "id"), title: expectString(record.title, "title"), scope: expectString(record.scope, "scope"), createdAt: record.createdAt };
   });
+}
+
+export async function getNotificationState(): Promise<{ enabled: boolean; permissionGranted: boolean }> {
+  return Capacitor.isNativePlatform() ? native.notificationState() : { enabled: false, permissionGranted: false };
+}
+export async function markNotificationSyncError(scope: string, message: string): Promise<void> {
+  if (Capacitor.isNativePlatform()) await native.summaryError({ scope, message });
+}
+export async function openNotificationSettings(): Promise<void> {
+  if (Capacitor.isNativePlatform()) await native.openNotificationSettings();
 }

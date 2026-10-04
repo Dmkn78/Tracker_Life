@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="48dp"
+    android:gravity="center_vertical" android:orientation="horizontal">
+    <LinearLayout android:id="@+id/notification_overview" android:layout_width="0dp" android:layout_height="match_parent"
+        android:layout_weight="1" android:gravity="center_vertical" android:orientation="vertical" android:paddingEnd="16dp">
+        <TextView android:id="@+id/notification_count" style="@style/TextAppearance.Compat.Notification.Title"
+            android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center"
+            android:maxLines="1" android:textSize="18sp" />
+        <ProgressBar android:id="@+id/notification_progress" style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="5dp" android:layout_marginTop="4dp"
+            android:progressTint="#A49AD4" android:progressBackgroundTint="#557A7489" />
+    </LinearLayout>
+    <ImageButton android:id="@+id/notification_add" android:layout_width="48dp" android:layout_height="48dp"
+        android:src="@drawable/ic_quick_add" android:tint="#A49AD4" android:padding="12dp"
+        android:background="@drawable/notification_add_background" android:contentDescription="Ajouter une tâche" />
+</LinearLayout>
