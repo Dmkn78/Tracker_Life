@@ -130,6 +130,7 @@ class Task(Base):
     objectiveId: Mapped[str | None] = mapped_column(String)
     companyId: Mapped[str | None] = mapped_column(String)
     title: Mapped[str] = mapped_column(Text, nullable=False)
+    isDay: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     description: Mapped[str | None] = mapped_column(Text)
     date: Mapped[date | None] = mapped_column(Date)
     startTime: Mapped[str | None] = mapped_column(Text)
@@ -141,6 +142,17 @@ class Task(Base):
     status: Mapped[str] = mapped_column(_enum(TASK_STATUSES, "TaskStatus"), nullable=False, default="PLANNED")
     notDoneReason: Mapped[str | None] = mapped_column(Text)
     sortOrder: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class TaskTemplate(Base):
+    __tablename__ = "TaskTemplate"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    userId: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    fields: Mapped[dict] = mapped_column(JSONB, nullable=False)
     createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
     updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
 

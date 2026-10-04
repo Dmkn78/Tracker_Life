@@ -1,6 +1,7 @@
 """Life Regime Tracker standalone API application."""
 
 import logging
+from contextlib import asynccontextmanager
 from importlib.util import find_spec
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -10,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 from .config import get_settings
 from .routers import (
+    assistant,
     auth,
     calendar_events,
     companies,
@@ -18,6 +20,7 @@ from .routers import (
     habits,
     history,
     life_terminal,
+    mobile_update,
     objectives,
     objective_planning,
     performance,
@@ -25,15 +28,26 @@ from .routers import (
     settings as settings_router,
     tags,
     tasks,
+    task_templates,
     thinking_notes,
     time_allocation,
+    transcription_jobs,
 )
 from .models import User
 from .security import get_current_user
 
 logger = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        yield
+    finally:
+        await transcription_jobs.stop_jobs()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Life Regime Tracker API",
     version="0.1.0",
     description="Standalone backend API for the Life Regime Tracker frontend.",
@@ -84,10 +98,12 @@ def health() -> dict[str, bool]:
 
 
 app.include_router(auth.router)
+app.include_router(assistant.router)
 app.include_router(objective_planning.router)
 app.include_router(daily_log.router)
 app.include_router(emotional_reviews.router)
 app.include_router(tasks.router)
+app.include_router(task_templates.router)
 app.include_router(calendar_events.router)
 app.include_router(habits.router)
 app.include_router(history.router)
@@ -104,6 +120,8 @@ else:
     def unavailable_transcription(user: User = Depends(get_current_user)):
         raise HTTPException(status_code=503, detail="Transcription module is not installed")
 app.include_router(life_terminal.router)
+app.include_router(mobile_update.router)
+app.include_router(transcription_jobs.router)
 app.include_router(companies.router)
 app.include_router(tags.router)
 app.include_router(thinking_notes.router)

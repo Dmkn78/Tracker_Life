@@ -76,6 +76,8 @@ Documentation OpenAPI : `http://127.0.0.1:8000/docs`.
 | `GET` | `/api/history` | historique agrégé |
 | `GET` | `/api/reports/week` | export hebdomadaire |
 | `GET` | `/api/life-terminal` | read model du terminal |
+| `POST` | `/api/assistant/models` | découverte authentifiée des modèles LM Studio |
+| `POST` | `/api/assistant/preview` | propositions de tâches ou analyse jour/7 jours, sans écriture |
 | `POST` | `/api/transcribe` | relais authentifié vers Whisper |
 
 Toutes les routes sauf health et login exigent normalement une session ; logout peut effacer un cookie sans session valide.

@@ -20,6 +20,7 @@ export type TodoTask = {
   id: string;
   title: string;
   description: string | null;
+  isDay?: boolean;
   date: string | null;
   startTime: string | null;
   endTime: string | null;
@@ -41,6 +42,7 @@ export type TodoTask = {
 /** One task's editable fields, shared by the single-task form and each row of the multi-task form. */
 export type TodoTaskFields = {
   title: string;
+  isDay: boolean;
   description: string;
   descriptionChoice: TodoDescriptionChoice;
   date: string;
@@ -67,10 +69,13 @@ export type ObjectiveOption = {
   title: string;
   horizon: string;
   color?: string;
+  weekId?: string | null;
+  targetDate?: string | null;
 };
 
 export type TodoTaskWriteValues = {
   title: string;
+  isDay: boolean;
   description: string | null;
   date: string | null;
   startTime: string | null;
@@ -89,8 +94,9 @@ export type TodoTaskWriteValues = {
 export function emptyTodoTaskFields(date: string): TodoTaskFields {
   return {
     title: "",
+    isDay: false,
     description: "",
-    descriptionChoice: "no",
+    descriptionChoice: "yes",
     date,
     startTime: "",
     endTime: "",
@@ -117,6 +123,7 @@ export function isTodoStatus(value: string): value is TodoStatus {
 export function todoTaskFieldsFromTask(task: TodoTask): TodoTaskFields {
   return {
     title: task.title,
+    isDay: task.isDay ?? false,
     description: task.description ?? "",
     descriptionChoice: task.description ? "yes" : "no",
     date: task.date ?? "",
@@ -172,7 +179,8 @@ export function setTodoTaskProgress(
 
 export function toTodoTaskWriteValues(fields: TodoTaskFields): TodoTaskWriteValues {
   return {
-    title: fields.title.trim(),
+    title: fields.isDay ? "Journée" : fields.title.trim(),
+    isDay: fields.isDay,
     description: fields.descriptionChoice === "yes" ? fields.description.trim() || null : null,
     date: fields.date || null,
     startTime: fields.startTime || null,
@@ -187,4 +195,8 @@ export function toTodoTaskWriteValues(fields: TodoTaskFields): TodoTaskWriteValu
     status: fields.status,
     notDoneReason: fields.status === "not_done" ? fields.notDoneReason.trim() || null : null
   };
+}
+
+export function hasTodoTaskContent(fields: TodoTaskFields): boolean {
+  return fields.isDay || Boolean(fields.title.trim() || (fields.descriptionChoice === "yes" && fields.description.trim()));
 }

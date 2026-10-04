@@ -96,9 +96,9 @@ export async function getCurrentUser() {
   return prisma.user.findUnique({ where: { id: session.userId } });
 }
 
-export async function requireUser() {
+export async function requireUser(returnTo?: "/todo?create=today") {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect(returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : "/login");
   return user;
 }
 

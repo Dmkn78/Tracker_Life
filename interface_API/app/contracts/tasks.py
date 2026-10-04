@@ -13,7 +13,8 @@ from .enums import TaskImportance, TaskStatus
 class TaskItem(ApiRequest):
     """One task's fields, used both for single-task create and each row of a batch create."""
 
-    title: str
+    title: str | None = None
+    is_day: bool = False
     description: str | None = None
     date: Date | None = None
     start_time: str | None = None
@@ -32,11 +33,7 @@ class TaskItem(ApiRequest):
 
 
 class TaskCreateRequest(TaskItem):
-    """Single-task create when `items` is absent, batch create when present.
-
-    `title` is optional here (unlike TaskItem) because it is only required
-    per-row when `items` is used.
-    """
+    """Single-task create when `items` is absent, batch create when present."""
 
     title: str | None = None
     items: list[TaskItem] | None = None
@@ -44,11 +41,10 @@ class TaskCreateRequest(TaskItem):
     def resolve_items(self) -> list[TaskItem]:
         if self.items is not None:
             return self.items
-        if not self.title:
-            return []
         return [
             TaskItem(
                 title=self.title,
+                isDay=self.is_day,
                 description=self.description,
                 date=self.date,
                 startTime=self.start_time,
@@ -71,6 +67,7 @@ class TaskCreateRequest(TaskItem):
 class TaskUpdateRequest(ApiRequest):
     id: str = Field(min_length=1)
     title: str | None = None
+    is_day: bool | None = None
     description: str | None = None
     date: Date | None = None
     start_time: str | None = None

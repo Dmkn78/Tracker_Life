@@ -17,3 +17,6 @@ android/.gradle/
 android/local.properties
 android/app/build/
 android/build/
+
+# Generated mobile interface published alongside the website
+public/mobile-app/

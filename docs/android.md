@@ -1,95 +1,107 @@
-# Life Regime pour Android
+# Life Regime Android — interface mobile (1.0.8)
 
-L’application Android embarque ses écrans React avec Capacitor 8.5.2. Elle réutilise les composants To-do, Objectives et Performance, leur logique et le CSS du projet. Vite assemble ces composants sans embarquer le serveur Next.js. Le site web reste disponible via Next.js.
+La version 1.0.8 ajoute la publication automatique des APK depuis GitHub et leur installation depuis **Mon téléphone → Version et mises à jour**. Le serveur garde le jeton du dépôt privé ; le téléphone reçoit seulement les métadonnées et le fichier APK. Android vérifie toujours la signature et demande de confirmer l’installation.
 
-## Construire et installer
+## Fonctionnement
 
-Prérequis : Node.js 22+, JDK 21 (fourni avec Android Studio compatible), Android Studio 2025.2.1 ou ultérieur, Android SDK Platform 36 et ses Build Tools. Android minimum : 7.0 / API 24. Les versions sont fixées dans `package.json` et `android/variables.gradle`.
+La version 1.0.7 rétablit l’interface téléphone : **Tâches, Planning, Logs, Objectifs, Plus**, bouton + et page **Mon téléphone** avec apparence, suivi, notifications, connexion et mises à jour. Elle utilise les composants métier du site et les données de ses API. Elle ne redirige plus vers les pages de bureau comme la version 1.0.6.
 
-À la racine du projet :
+L’APK embarque une interface mobile fonctionnelle, dont la dictée actuelle à **trente minutes / 100 Mo**. Un site qui n’a pas encore publié la nouvelle interface mobile reste utilisable comme serveur de données : la notification et les paramètres n’attendent pas l’installation d’un composant dans la page web.
+
+## Installer et connecter
+
+Installer `Life-Regime-1.0.7.apk` **par-dessus** l’ancienne version, avec la même signature. Le serveur déjà enregistré et les captures SQLite restent conservés. Les préférences de l’ancienne interface mobile sont récupérées lorsque présentes. Une reconnexion peut être nécessaire si la session a expiré.
+
+Dans **Réglages → Connexion à mes données**, utiliser l’adresse du site ou de l’API et la clé habituelle. Les tâches, logs et objectifs restent sur le serveur. L’application vérifie la session avant de se déclarer connectée. Les thèmes et le formulaire de connexion restent accessibles si le serveur est indisponible.
+
+## Notification des tâches
+
+**Réglages → Notification des tâches** affiche :
+
+- l’état d’activation et les autorisations Android ;
+- le nombre réellement reçu du serveur, par exemple `4 / 12 terminées` ;
+- la date et l’heure du dernier relevé ;
+- un aperçu de trois tâches restantes ;
+- **Activer le bouton +**, **Actualiser le compteur** et, si nécessaire, **Autorisations Android**.
+
+Le compteur utilise `/api/tasks?scope=today&date=...`, avec la date locale du téléphone. Il exclut les tâches annulées. Il se met à jour après une modification, au retour au premier plan, au retour du réseau et toutes les trente secondes pendant que l’application est visible. Une ancienne capture en attente ne bloque pas cette lecture. Une panne ne remplace jamais les données par un faux zéro : l’erreur est visible dans les paramètres et la notification conserve le dernier relevé daté.
+
+La notification compacte affiche le compteur, la progression et le +. Dépliée, elle affiche aussi les trois premières tâches restantes. Le + ouvre directement **l’éditeur Todo de l’application**, daté d’aujourd’hui, avec une date modifiable. Toucher l’aperçu ouvre la liste. Il s’agit d’une notification, pas d’un widget placé sur l’écran d’accueil.
+
+L’application ne fait pas de requêtes permanentes lorsqu’elle est fermée : les changements effectués sur le site sont repris à la prochaine ouverture. Les intitulés ne sont pas affichés sur l’écran verrouillé (`VISIBILITY_SECRET`).
+
+## Mettre l’interface mobile à jour depuis le site
+
+`npm run build:web` compile **deux présentations avec les mêmes composants** : le site Next.js et l’interface mobile Vite dans `public/mobile-app/`. Ce dossier généré doit être présent sur le serveur qui expose le site. Une API FastAPI seule ne sert pas ces fichiers.
+
+La publication comprend :
+
+- `/mobile-app/index.html` et ses fichiers `assets/` ;
+- `/mobile-app/release.json` : identifiant de build, date, entrée fixe, version Android minimale.
+
+L’application vérifie la publication à l’ouverture, au retour au premier plan et chaque minute tant qu’elle est visible. **Réglages → Interface mobile → Mettre à jour l’interface** ouvre la présentation mobile publiée, après confirmation pour terminer la saisie/dictée en cours. Elle garde les cinq onglets et les paramètres téléphone. Le thème et la langue sont transférés lors du changement d’interface.
+
+Une fois ce mode activé, une nouvelle ouverture à froid charge l’interface mobile publiée depuis le réseau ; une application déjà ouverte propose le nouveau build sans effacer son formulaire. Si cette interface est inaccessible ou ne démarre pas sous vingt-cinq secondes, l’APK revient à son interface intégrée, avec une explication et sans boucle de rechargement. **Utiliser la version intégrée** permet aussi de revenir manuellement. Une interface nécessitant des fonctions natives plus récentes demande d’abord une mise à jour d’APK.
+
+Les tâches restent sur le serveur dans les deux modes. Une connexion réseau est nécessaire pour les consulter/enregistrer ; les brouillons de logs sont locaux et séparés par origine. Terminer/enregistrer les brouillons avant de changer de mode, comme indiqué par la confirmation. Les captures SQLite avec accusé de réception restent partagées et limitées au serveur d’origine.
+
+Un `git push` ne déploie pas le serveur à lui seul. Sur le VPS : récupérer le code, exécuter `npm run build:web` puis redémarrer le service habituel. Le build génère `public/mobile-app` automatiquement ; en cas de livraison par copie, copier également ce dossier. L’index et le manifeste sont servis sans cache. Conserver les anciens fichiers `assets` pendant les déploiements évite de casser les pages déjà ouvertes. Préférer un déploiement atomique du dossier de publication. Sans publication mobile, l’interface intégrée reste utilisable et les réglages le précisent.
+
+## Compiler l’APK
+
+Prérequis : Node.js 22+, JDK 21, Android Studio, SDK Platform 36 et Build Tools. Android minimum : API 24.
 
 ```powershell
 npm install
-npx prisma generate
-npx prisma migrate deploy
-npm run build
+npm run build:mobile
 npx cap sync android
 npx cap open android
 ```
 
-`npm run build` compile le site web avec Webpack, puis les fichiers embarqués dans `mobile-dist`. Webpack évite le plantage Turbopack constaté sur ce poste Windows. Pour une modification uniquement mobile, `npm run build:mobile` suffit avant `npx cap sync android`.
-
-Dans Android Studio : attendre la synchronisation Gradle, puis **Build → Generate App Bundles or APKs → Generate APKs** (ou **Build APK(s)** suivant la version). Le build debug produit un APK signé pour une installation personnelle :
-
-```text
-android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-Alternative avec `ANDROID_HOME` et `JAVA_HOME` configurés :
+Ou avec le SDK/JDK configuré :
 
 ```powershell
 npm run android:apk
 ```
 
-Copier l’APK sur le téléphone, l’ouvrir et autoriser ponctuellement cette source d’installation. Avec le débogage USB déjà autorisé, `adb install -r android/app/build/outputs/apk/debug/app-debug.apk` installe ou met à jour l’application. Conserver la même clé de signature pour les futures mises à jour. Une désinstallation efface les captures locales non synchronisées.
+Le workflow `npm run build → npx cap sync android → Android Studio` reste valide. L’APK se trouve dans `android/app/build/outputs/apk/debug/app-debug.apk`.
 
-Le script vérifie la présence du SDK avant la compilation et ne prétend pas produire un APK lorsqu’il manque. La génération du bundle web et `cap sync` ne compilent pas le code Java : un build Gradle et un essai sur téléphone restent nécessaires pour valider la partie native.
+Conserver la clé de signature pour pouvoir installer par-dessus l’existant. Dans cet environnement, `.runtime/build-apk-local.ps1` sélectionne le SDK, le JDK et la clé `.runtime/android-user/debug.keystore` déjà utilisée. Les changements de pages/CSS/logique peuvent ensuite venir de la publication mobile ; les nouvelles permissions ou fonctions Java exigent encore un APK.
 
-## Connecter le téléphone aux données existantes
+## Publication des APK natifs
 
-L’APK ne contient ni PostgreSQL, ni FastAPI, ni une copie de la clé d’accès. Les objectifs, tâches synchronisées, journaux et calculs de capital restent sur le serveur existant.
+Les pushes sur `main` et `dev_branch` lancent `.github/workflows/ci.yml`. Après les tests web/mobile/API/PostgreSQL et Android, le job `Publish signed Android update` compile un APK release avec la clé persistante, vérifie sa signature, puis publie une GitHub Release complète : `release.json` et `<sha256>.apk`. Le code Android croît automatiquement à chaque publication, même si le nom de version reste identique.
 
-Pour une utilisation personnelle sur le même Wi-Fi, lancer l’API sur le PC :
+Configurer ces secrets privés du dépôt : `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Ils doivent correspondre à la clé de l’application déjà installée. Une clé neuve ne permet pas une mise à jour par-dessus. Les builds personnels précédents utilisent `.runtime/android-user/debug.keystore` ; le fichier doit rester hors de Git. Son transfert vers les secrets GitHub nécessite l’autorisation du propriétaire.
 
-```powershell
-cd interface_API
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+Sur le VPS, dans l’environnement privé de l’API :
+
+```dotenv
+MOBILE_GITHUB_REPOSITORY=Dmkn78/Tracker_Life
+MOBILE_GITHUB_TOKEN=<jeton privé limité à Contents: read sur ce dépôt>
 ```
 
-Autoriser si nécessaire le port 8000 sur le réseau **privé** dans le pare-feu Windows. Dans **Réglages → Connexion à mes données**, saisir `http://IP_LOCALE_DU_PC:8000`, puis la clé habituelle. `127.0.0.1` sur le téléphone ne désigne pas le PC. L’émulateur Android peut utiliser `http://10.0.2.2:8000`.
+Déployer le code serveur puis redémarrer le service API. `/api/mobile-update` lit la dernière release Android publiée et `/api/mobile-update/apk/<sha256>` télécharge et vérifie l’APK, puis le conserve dans le cache local. Une erreur GitHub n’est jamais présentée comme « à jour ». Le jeton n’est jamais envoyé au téléphone. La publication d’une release ne déploie pas le VPS : les contrôles Actions et le déploiement serveur restent deux opérations distinctes.
 
-Le transport HTTP natif Capacitor conserve le cookie de session émis par l’API ; la clé saisie est effacée de l’état du formulaire après connexion. HTTP est accepté uniquement pour une IP privée ou localhost. Pour accéder aux données en dehors du Wi-Fi personnel, fournir un serveur HTTPS accessible au téléphone. Aucune ouverture de port publique n’est effectuée par ce projet. Si l’API impose des cookies `Secure`, utiliser HTTPS.
+Pour publier localement, `npm run android:release` empaquette un **APK release signé déjà compilé**. Le build release exige `ANDROID_KEYSTORE_PATH`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Pour les builds debug historiques : `npm run android:release -- .runtime/mobile-release debug`. Sans `MOBILE_GITHUB_REPOSITORY`, l’API conserve la publication locale depuis `MOBILE_RELEASE_DIR` ou `.runtime/mobile-release` : copier l’APK puis `release.json` en dernier.
 
-Les captures sont rattachées à l’adresse du serveur. Changer d’adresse ne transfère pas automatiquement les captures en attente à un autre serveur ; reconnecter l’ancienne adresse pour les synchroniser.
+Le panneau Android contrôle taille, hash, identifiant, version croissante et signature avant installation. Une ancienne APK sans plugin de mise à jour nécessite une première installation manuelle de la nouvelle APK avec la même signature. Une interface mobile publiée récente propose aussi un lien de téléchargement navigateur dans ce cas. Ne pas désinstaller l’application pour conserver ses données locales.
 
-## Bouton + dans les notifications
+## Sources et vérification
 
-1. Connecter une première fois l’application.
-2. Ouvrir **Réglages → Activer le bouton +**.
-3. Accepter l’autorisation de notifications Android si elle est demandée.
-4. Dérouler les notifications, toucher **+**, saisir un titre et valider au clavier ou avec **Ajouter**.
-
-La saisie s’ouvre dans une petite activité Android. Elle fonctionne sans réseau et conserve la capture dans SQLite. À la prochaine ouverture connectée de Life Regime, l’application envoie les captures au serveur et ne les efface localement qu’après accusé de réception. Un bouton **Synchroniser** permet de réessayer. Le statut « en attente » ne signifie pas que la tâche est déjà sur le serveur.
-
-Chaque capture possède un UUID. Le serveur conserve un reçu d’importation, ce qui évite les doublons après une coupure et la réapparition d’une tâche supprimée après un nouvel essai. Les nouvelles tâches arrivent sans date dans l’entonnoir et ne génèrent aucune récompense avant exécution.
-
-La notification est facultative, sans service permanent ni synchronisation réseau en arrière-plan. Android peut autoriser son masquage ou la bloquer dans les réglages du canal ; rouvrir l’application et réactiver le bouton si nécessaire. Elle est restaurée au démarrage du téléphone lorsque les autorisations le permettent. Les titres des tâches ne sont pas affichés sur l’écran verrouillé.
-
-## Entonnoir, objectifs et interface mobile
-
-- **Planning / Entonnoir** : bandeau vertical de toutes les tâches non terminées, y compris celles déjà datées. Création courte, objectif lié, accès au détail et retrait du planning.
-- **Planification** : glisser une tâche dans le calendrier, ou toucher **Placer** puis un créneau. Le même identifiant de tâche est déplacé ; aucune copie n’est créée. La vue jour facilite l’usage au doigt, avec une vue semaine disponible.
-- **Tâches** : liste et éditeur actuels, progression, statut, journal d’exécution et filtres.
-- **Objectifs** : hiérarchie, milestones, planning et prévisions existants.
-- **Capital** : métriques et règles existantes, fondées sur les données enregistrées.
-- Navigation à cinq onglets, bouton + accessible en haut, teintes crème et zones adaptées au clavier et aux bords de l’écran.
-
-Seule la capture rapide est disponible hors connexion. La consultation et l’édition des données existantes nécessitent le serveur. La connexion n’est pas un mode de synchronisation complet entre plusieurs bases de données.
-
-## Organisation et contrôles
-
-`mobile/` contient l’entrée embarquée, la connexion native, l’outbox et le CSS téléphone. `features/todo/components/TaskFunnel.tsx` est partagé avec le web. `native/android/` est la source des classes Java, de l’icône et du thème natif : le hook `capacitor:sync:after` les copie dans `android/app/src/main` et met à jour le manifeste de façon répétable. Modifier ces sources plutôt que leurs copies.
+- `mobile/MobileApp.tsx` : présentation mobile, connexion et navigation.
+- `mobile/NotificationSettings.tsx`, `useNotificationSummary.ts` : notification et état de synchronisation.
+- `mobile/InterfaceUpdateControl.tsx` : publication et changement d’interface.
+- `scripts/build-website.mjs`, `mobile/vite.config.ts` : publication mobile avec le site.
+- `native/android/` : sources Java/ressources copiées par le hook de `cap sync` vers `android/app/src/main`.
 
 ```powershell
-npx tsc -p tsconfig.mobile.json --noEmit
 npm run test:mobile
-npm run test:todo
+npx tsc -p tsconfig.mobile.json --noEmit
+npm run build:web
 npm run build:mobile
 npx cap sync android
+android/gradlew.bat -p android :app:testDebugUnitTest :app:assembleDebug
 ```
 
-Les tests PostgreSQL utilisent des transactions annulées : `RUN_DATABASE_TESTS=1` et `python -m unittest discover -s tests -q` dans `interface_API`. Tester sur téléphone : première connexion, permission refusée puis accordée, capture hors ligne, fermeture/redémarrage, reprise réseau, replanification au doigt et au drag, correction du temps réel. Vérifier qu’une coupure après réception côté serveur ne crée pas de doublon au prochain envoi.
-
-Le test instrumenté `QuickCaptureStoreTest` vérifie la persistance SQLite après réouverture et l’accusé de réception limité au bon serveur. Avec un téléphone ou un émulateur connecté, le lancer depuis Android Studio, ou avec `android/gradlew.bat -p android :app:connectedDebugAndroidTest`. Ce test nécessite le SDK et un appareil ; il n’est pas exécuté par les tests JavaScript.
-
-Références officielles : [prérequis Capacitor](https://capacitorjs.com/docs/getting-started/environment-setup), [HTTP natif](https://capacitorjs.com/docs/apis/http), [permission Android des notifications](https://developer.android.com/develop/ui/compose/notifications/notification-permission), [Android Studio et SDK](https://developer.android.com/studio).
+Tester sur téléphone : compteur face aux tâches du site, marquer une tâche terminée, ouvrir le + application fermée et ouverte, changer sa date, refuser/autoriser les notifications, thème, reconnexion, dictée, publication mobile, panne du serveur et retour à l’interface intégrée. Les tests locaux couvrent notamment un jeu de douze tâches, la progression, les erreurs réseau, les thèmes et le changement d’interface ; ils ne remplacent pas un essai sur l’appareil.

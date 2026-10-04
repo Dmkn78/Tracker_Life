@@ -1,6 +1,8 @@
 import { defineConfig } from "vite";
+import { MINIMUM_MOBILE_NATIVE_BUILD } from "./nativeCompatibility";
 import { fileURLToPath } from "node:url";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 
@@ -12,10 +14,23 @@ for (const declaration of readFileSync(resolve(iconRoot, "lucide-react.mjs"), "u
   for (const name of declaration[1].matchAll(/default as (\w+)/g)) iconExports.set(name[1], resolve(iconRoot, declaration[2]));
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+const hosted = mode === "hosted";
+const version = process.env.NEXT_PUBLIC_WEBSITE_VERSION ?? randomUUID();
+const builtAt = process.env.MOBILE_BUILD_TIME ?? new Date().toISOString();
+return {
   root: fileURLToPath(new URL(".", import.meta.url)),
-  base: "./",
+  base: hosted ? "/mobile-app/" : "./",
+  define: { __MOBILE_BUILD_VERSION__: JSON.stringify(version), __MOBILE_BUILD_TIME__: JSON.stringify(builtAt) },
   plugins: [{
+    name: "publish-mobile-interface",
+    closeBundle() {
+      if (!hosted) return;
+      const directory = fileURLToPath(new URL("../public/mobile-app", import.meta.url));
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(resolve(directory, "release.json"), JSON.stringify({ schema: 1, version, builtAt, minNativeBuild: MINIMUM_MOBILE_NATIVE_BUILD, entry: "/mobile-app/index.html" }, null, 2));
+    }
+  }, {
     name: "mobile-direct-icon-imports",
     enforce: "pre",
     transform(source, id) {
@@ -33,14 +48,16 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("..", import.meta.url)),
-      "next/link": fileURLToPath(new URL("./MobileLink.tsx", import.meta.url))
+      "next/link": fileURLToPath(new URL("./MobileLink.tsx", import.meta.url)),
+      "next/navigation": fileURLToPath(new URL("./MobileNavigation.ts", import.meta.url))
     },
     dedupe: ["react", "react-dom"]
   },
   build: {
-    outDir: "../mobile-dist", emptyOutDir: true,
+    outDir: hosted ? "../public/mobile-app" : "../mobile-dist", emptyOutDir: !hosted,
     rollupOptions: { onwarn(warning, warn) { if (warning.code !== "MODULE_LEVEL_DIRECTIVE" && warning.code !== "SOURCEMAP_ERROR") warn(warning); } }
   },
   server: { host: "127.0.0.1", port: 4173, strictPort: true, proxy: previewProxy },
   preview: { host: "127.0.0.1", port: 4173, strictPort: true, proxy: previewProxy }
+};
 });

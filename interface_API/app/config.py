@@ -107,7 +107,7 @@ def get_settings() -> Settings:
         frontend_origins=frontend_origins,
         api_host=os.environ.get("API_HOST", "127.0.0.1"),
         api_port=_read_positive_integer("API_PORT", 8000),
-        max_audio_bytes=_read_positive_integer("MAX_AUDIO_BYTES", 25 * 1024 * 1024),
+        max_audio_bytes=_read_positive_integer("MAX_AUDIO_BYTES", 100 * 1024 * 1024),
         whisper_timeout_seconds=_read_positive_integer("WHISPER_TIMEOUT_SECONDS", 180),
         is_production=is_production,
     )

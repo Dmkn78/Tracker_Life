@@ -3,7 +3,7 @@
   "compilerOptions": {
     "incremental": false,
     "plugins": [],
-    "paths": { "@/*": ["./*"], "next/link": ["./mobile/MobileLink.tsx"] }
+    "paths": { "@/*": ["./*"], "next/link": ["./mobile/MobileLink.tsx"], "next/navigation": ["./mobile/MobileNavigation.ts"] }
   },
   "include": ["mobile/**/*.ts", "mobile/**/*.tsx", "capacitor.config.ts"],
   "exclude": ["node_modules", ".runtime", "android", "mobile-dist"]

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { ThemeProvider } from "next-themes";
+import { AppThemeProvider } from "@/features/interface/components/AppThemeProvider";
 import { AppearanceProvider } from "@/features/interface/components/AppearanceProvider";
-import { APPEARANCE_PREFERENCES, DEFAULT_APPEARANCE } from "@/features/interface/domain/appearance";
 import { LocaleProvider } from "@/features/interface/localization/LocaleProvider";
+import { AndroidWebsiteBridge } from "@/features/android/components/AndroidWebsiteBridge";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,17 +18,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme={DEFAULT_APPEARANCE}
-          enableColorScheme={false}
-          enableSystem={false}
-          themes={[...APPEARANCE_PREFERENCES]}
-        >
+        <AppThemeProvider>
           <LocaleProvider>
-            <AppearanceProvider>{children}</AppearanceProvider>
+            <AppearanceProvider><AndroidWebsiteBridge />{children}</AppearanceProvider>
           </LocaleProvider>
-        </ThemeProvider>
+        </AppThemeProvider>
       </body>
     </html>
   );

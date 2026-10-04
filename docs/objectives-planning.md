@@ -42,7 +42,9 @@ Pure tests cover rollups, sparse histories, velocity, momentum, simulation and c
 
 ## To-do integration
 
-To-do reuses the same cards, task editor and list, with an hourly weekly planner, an objectives-by-week monthly roadmap, search and objective/status filters. Calendar slots prefill task creation; dragging persists the task's date and times. The execution view compares estimated, remaining and recorded work, suggests up to four tasks to review, and displays the existing objective trajectory calculations. A scheduled task date is not treated as a deadline.
+To-do opens on **Prepare my week**: a weekly objectives table, linked tasks with estimated working time, and an hourly calendar for placing the work across the seven days. Creating an objective uses the displayed week and its final day as the default target date. New tasks keep their objective link and duration; dragging or using the placement form persists their date and times. Day totals make the planned workload visible. The task list remains directly available.
+
+Month overview, weekly review, search filters, assistant help and performance metrics are optional views or disclosures. The objective form starts with the desired result, timeframe and first action; hierarchy, status and other settings are optional details. The task editor similarly keeps scheduling and objective fields visible while grouping templates, tags and progress in more options. The review compares estimated, remaining and recorded work and suggests tasks to revisit. A scheduled task date is not treated as a deadline.
 
 `POST /api/tasks/execution` records done/partial/not-done with optional actual minutes. Migration `20260913190000_task_execution` links recorded work to a task. One cumulative entry per task and work date is corrected on repeat submission; different work days retain separate entries. Entries feed the same Performance calculation and objective work history. Estimated minutes are never substituted for actual minutes. Nonproductive tasks do not earn work capital. Task deletion cascades to its work entries; cancellation excludes the task completion reward but does not erase past work.
 

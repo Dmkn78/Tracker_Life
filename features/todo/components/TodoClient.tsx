@@ -24,6 +24,7 @@ import {
 } from "@/components/ui";
 import {
   createTodoTasks,
+  createWeeklyTodoObjective,
   deleteTodoTask,
   listObjectiveOptions,
   listTodoTasks,
@@ -37,6 +38,7 @@ import { listTags } from "@/features/shared/api/tagsApi";
 import type { Company, Tag } from "@/features/shared/domain/tagCompany";
 import {
   emptyTodoTaskFields,
+  hasTodoTaskContent,
   isTodoImportance,
   isTodoStatus,
   setTodoTaskImportance,
@@ -47,7 +49,6 @@ import {
   todoTaskFieldsFromTask,
   toTodoTaskWriteValues,
   type ObjectiveOption,
-  type TodoDescriptionChoice,
   type TodoImportance,
   type TodoScope,
   type TodoStatus,
@@ -75,6 +76,9 @@ import { TodoExecutionDrawer } from "./TodoExecutionDrawer";
 import { TodoObjectiveTrajectory } from "./TodoObjectiveTrajectory";
 import { monthRange, summarizeTasks, taskSlot } from "../domain/todoPlanning";
 import { logTodoExecution } from "../api/todoApi";
+import { AssistantPanel } from "@/features/assistant/components/AssistantPanel";
+import { TaskContentEditor } from "./TaskContentEditor";
+import { TodoTemplatePanel } from "./TodoTemplatePanel";
 
 type DrawerState =
   | { kind: "edit"; id: string; draft: TodoTaskFields }
@@ -112,7 +116,13 @@ function newRow(date: string): TodoTaskRow {
   return { ...emptyTodoTaskFields(date), key: `row-${rowKeySeed}`, enabled: true };
 }
 
-export function TodoClient({ today, initialView = "list" }: { today: string; initialView?: "list" | "funnel" }) {
+export function TodoClient({ today, initialView = "funnel", createDate, onCreateOpened, refreshKey = 0 }: {
+  today: string;
+  initialView?: "list" | "funnel";
+  createDate?: string | null;
+  onCreateOpened?: () => void;
+  refreshKey?: number;
+}) {
   const { locale, translate } = useLocale();
   const [date, setDate] = useState(today);
   const [scope, setScope] = useState<TodoScope>(initialView === "funnel" ? "all" : "today");
@@ -125,6 +135,7 @@ export function TodoClient({ today, initialView = "list" }: { today: string; ini
   const [executionTask, setExecutionTask] = useState<TodoTask | null>(null);
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<TodoTask[]>([]);
+  const [assistantRefreshKey, setAssistantRefreshKey] = useState(0);
   const [objectiveOptions, setObjectiveOptions] = useState<ObjectiveOption[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
@@ -135,6 +146,7 @@ export function TodoClient({ today, initialView = "list" }: { today: string; ini
   const [objectiveOptionsError, setObjectiveOptionsError] = useState<string | null>(null);
   const taskWriteCoordinatorRef = useRef<TaskWriteCoordinator | null>(null);
   const reorderWriteCoordinatorRef = useRef<ReorderWriteCoordinator | null>(null);
+  const objectiveMutationRevisionRef = useRef(0);
 
   if (!taskWriteCoordinatorRef.current) {
     taskWriteCoordinatorRef.current = createSerializedWriteCoordinator({
@@ -160,6 +172,15 @@ export function TodoClient({ today, initialView = "list" }: { today: string; ini
       }
     });
   }
+
+  useEffect(() => {
+    if (!createDate) return;
+    setDate(createDate); setScope("today"); setView("list");
+    setSearch(""); setObjectiveFilter("all"); setStatusFilter("all");
+    setDrawerError(null);
+    setDrawer({ kind: "create", createMode: "single", single: emptyTodoTaskFields(createDate), rows: [newRow(createDate), newRow(createDate)] });
+    onCreateOpened?.();
+  }, [createDate, onCreateOpened]);
 
   useEffect(() => {
     const requestController = new AbortController();
@@ -193,13 +214,22 @@ export function TodoClient({ today, initialView = "list" }: { today: string; ini
         }
       }).finally(() => { if (!requestController.signal.aborted) setLoading(false); });
     return () => requestController.abort();
-  }, [date, month, scope, translate, weekId]);
+  }, [date, month, scope, translate, weekId, refreshKey, assistantRefreshKey]);
 
   useEffect(() => {
     const requestController = new AbortController();
+    const mutationRevision = objectiveMutationRevisionRef.current;
     setObjectiveOptionsError(null);
     void listObjectiveOptions(requestController.signal)
-      .then(setObjectiveOptions)
+      .then((loadedObjectives) => {
+        if (requestController.signal.aborted) return;
+        setObjectiveOptions((current) => {
+          if (mutationRevision === objectiveMutationRevisionRef.current) return loadedObjectives;
+          const optionsById = new Map(loadedObjectives.map((objective) => [objective.id, objective]));
+          current.forEach((objective) => optionsById.set(objective.id, objective));
+          return [...optionsById.values()];
+        });
+      })
       .catch((error: unknown) => {
         if (!requestController.signal.aborted) {
           setObjectiveOptionsError(readApiErrorMessage(error, translate("todo.objectivesError")));
@@ -255,6 +285,10 @@ export function TodoClient({ today, initialView = "list" }: { today: string; ini
     setDrawerError(null);
 
     if (drawer.kind === "edit") {
+      if (!hasTodoTaskContent(drawer.draft)) {
+        setDrawerError(translate("todo.singleNameRequired"));
+        return;
+      }
       const task = tasks.find((candidate) => candidate.id === drawer.id);
       if (!task) return;
       taskWriteCoordinatorRef.current!.synchronizeConfirmedState(task.id, task);
@@ -275,11 +309,11 @@ export function TodoClient({ today, initialView = "list" }: { today: string; ini
 
     const items =
       drawer.createMode === "single"
-        ? drawer.single.title.trim()
+        ? hasTodoTaskContent(drawer.single)
           ? [toCreateItemPayload(drawer.single)]
           : []
         : drawer.rows
-            .filter((row) => row.enabled && row.title.trim())
+            .filter((row) => row.enabled && hasTodoTaskContent(row))
             .map((row) => toCreateItemPayload(row));
 
     if (items.length === 0) {
@@ -314,6 +348,19 @@ export function TodoClient({ today, initialView = "list" }: { today: string; ini
       setPageError(readApiErrorMessage(error, translate("todo.updateError")));
       return false;
     }
+  }
+
+  async function createFunnelObjective(input: { title: string; weekId: string }): Promise<ObjectiveOption> {
+    const objective = await createWeeklyTodoObjective(input);
+    objectiveMutationRevisionRef.current += 1;
+    setObjectiveOptions((current) => [...current.filter((option) => option.id !== objective.id), objective]);
+    setObjectiveOptionsError(null);
+    return objective;
+  }
+
+  async function captureFunnelTask(input: { title: string; objectiveId: string | null; estimatedMinutes: number }): Promise<void> {
+    const created = await createTodoTasks({ items: [{ ...input, date: null }] });
+    setTasks((current) => [...created, ...current]);
   }
 
   async function saveExecution(payload: Parameters<typeof logTodoExecution>[0]): Promise<void> {
@@ -377,7 +424,23 @@ export function TodoClient({ today, initialView = "list" }: { today: string; ini
         }
       />
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="space-y-3">
+        <Segmented aria-label={translate("todo.workflowViews")} className="w-full sm:w-auto">
+          <SegmentedButton active={view === "funnel"} onClick={() => { setView("funnel"); setScope("all"); setSearch(""); setObjectiveFilter("all"); setStatusFilter("all"); }}>{translate("todo.prepareWeek")}</SegmentedButton>
+          <SegmentedButton active={view === "list"} onClick={() => { setView("list"); changeScope("today"); }}>{translate("todo.taskList")}</SegmentedButton>
+        </Segmented>
+        <details className="rounded-2xl border border-line px-4 py-3" open={view === "weekly" || view === "monthly" || view === "insights" ? true : undefined}>
+          <summary className="focus-ring cursor-pointer text-sm text-muted">{translate("todo.otherViews")}</summary>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <SecondaryButton onClick={() => { setView("weekly"); setScope("week"); }}>{translate("todo.weekCalendar")}</SecondaryButton>
+            <SecondaryButton onClick={() => { setView("monthly"); setScope("month"); }}>{translate("todo.monthView")}</SecondaryButton>
+            <SecondaryButton onClick={() => { setView("insights"); setScope("week"); }}>{translate("todo.weekReview")}</SecondaryButton>
+          </div>
+          <p className="mt-2 text-xs text-muted">{translate("todo.reviewHelp")}</p>
+        </details>
+      </div>
+
+      {view !== "funnel" ? <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <Segmented aria-label={translate("todo.scopeOptions")} className="w-full lg:w-auto">
           {(["today", "tomorrow", "week", "month", "all"] as const).map((item) => (
             <SegmentedButton key={item} active={scope === item} onClick={() => changeScope(item)}>
@@ -417,9 +480,9 @@ export function TodoClient({ today, initialView = "list" }: { today: string; ini
             className="w-full sm:w-auto sm:min-w-[170px]"
           />
         ) : null}
-      </div>
+      </div> : null}
 
-      <div className="grid gap-3 md:grid-cols-3">
+      {view !== "funnel" ? <details className="rounded-2xl border border-line px-4 py-3"><summary className="focus-ring cursor-pointer text-sm text-muted">{translate("todo.taskSummary")}</summary><div className="mt-3 grid gap-3 md:grid-cols-3">
         <Metric label={translate("todo.tasks")} value={String(filteredTasks.length)} />
         <Metric label={translate("todo.done")} value={`${summary.completed}/${summary.total}`} tone={summary.completed > 0 ? "good" : "neutral"} />
         <Metric
@@ -427,7 +490,7 @@ export function TodoClient({ today, initialView = "list" }: { today: string; ini
           value={formatMinutes(summary.plannedMinutes)}
           detail={translate("todo.averageDone", { percent: summary.progress })}
         />
-      </div>
+      </div></details> : null}
 
       {pageError ? (
         <p role="alert" className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-300">
@@ -435,18 +498,19 @@ export function TodoClient({ today, initialView = "list" }: { today: string; ini
         </p>
       ) : null}
 
-      <div className="space-y-3">
-        <Segmented aria-label={fr ? "Présentation des tâches" : "Task presentation"}>{(["list", "funnel", "weekly", "monthly", "insights"] as const).map((mode) => <SegmentedButton key={mode} active={view === mode} onClick={() => { setView(mode); if (mode === "funnel") setScope("all"); if (mode === "weekly") setScope("week"); if (mode === "monthly") setScope("month"); }}>{({ funnel: fr ? "Entonnoir" : "Task funnel", list: fr ? "Liste" : "List", weekly: fr ? "Planning semaine" : "Weekly planning", monthly: fr ? "Roadmap mois" : "Monthly roadmap", insights: fr ? "Exécution & bilan" : "Execution & insights" })[mode]}</SegmentedButton>)}</Segmented>
+      {view !== "funnel" ? <details className="rounded-2xl border border-line px-4 py-3"><summary className="focus-ring cursor-pointer text-sm text-muted">{translate("todo.searchFilters")}</summary><div className="mt-3 space-y-3">
         <div className="grid gap-3 sm:grid-cols-3"><TextInput aria-label={fr ? "Rechercher une tâche" : "Find a task"} placeholder={fr ? "Rechercher une tâche…" : "Find a task…"} value={search} onChange={(event) => setSearch(event.target.value)} /><SelectInput aria-label={fr ? "Filtrer par objectif" : "Filter by objective"} value={objectiveFilter} onChange={(event) => setObjectiveFilter(event.target.value)}><option value="all">{fr ? "Tous les objectifs" : "All objectives"}</option><option value="unassigned">{fr ? "Sans objectif" : "Unassigned"}</option>{objectiveOptions.map((objective) => <option key={objective.id} value={objective.id}>{objective.title} · {objective.horizon}</option>)}</SelectInput><SelectInput aria-label={fr ? "Filtrer par statut" : "Filter by status"} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{fr ? "Tous les statuts" : "All statuses"}</option>{TODO_STATUSES.map((status) => <option key={status} value={status}>{translate(STATUS_LABEL_KEYS[status])}</option>)}</SelectInput></div>
-      </div>
+      </div></details> : null}
+      {objectiveOptionsError && view === "funnel" ? <p role="alert" className="rounded-xl bg-risk/10 px-3 py-2 text-sm text-risk">{objectiveOptionsError}</p> : null}
       {loading ? <SoftPanel><p role="status" className="text-sm text-muted">{fr ? "Chargement des tâches…" : "Loading tasks…"}</p></SoftPanel> : <>
         {view === "list" ? <SoftPanel className="p-3"><TodoList tasks={filteredTasks} onPatch={patchTask} onEdit={openEdit} onAdd={() => openCreate()} onDelete={deleteTask} onReorder={reorderTasks} onLog={setExecutionTask} /></SoftPanel> : null}
-        {view === "funnel" ? <TaskFunnel tasks={filteredTasks} onEdit={openEdit} onMove={patchTask} onCapture={async (title) => { const created = await createTodoTasks({ items: [{ title, date: null }] }); setTasks((current) => [...created, ...current]); }} /> : null}
+        {view === "funnel" ? <TaskFunnel tasks={tasks} objectives={objectiveOptions} today={today} onEdit={openEdit} onMove={patchTask} onCapture={captureFunnelTask} onCreateObjective={createFunnelObjective} /> : null}
         {view === "weekly" ? <TodoWeeklyCalendar tasks={filteredTasks} objectives={objectiveOptions} today={today} startDate={getWeekDateKeys(weekId)[0]} objectiveId={objectiveFilter === "all" || objectiveFilter === "unassigned" ? "" : objectiveFilter} onEdit={openEdit} onCreate={openCreate} onMove={patchTask} /> : null}
         {view === "monthly" ? <TodoMonthlyRoadmap tasks={filteredTasks} objectives={objectiveOptions} month={month} today={today} onEdit={openEdit} onCreate={openCreate} /> : null}
         {view === "insights" ? <><TodoExecutionInsights tasks={filteredTasks} objectives={objectiveOptions} today={today} onEdit={openEdit} onCreate={openCreate} /><TodoObjectiveTrajectory tasks={filteredTasks} objectives={objectiveOptions} month={scope === "month" ? month : today.slice(0, 7)} /></> : null}
       </>}
-      <PerformanceStrip refreshKey={tasks} />
+      <details className="rounded-2xl border border-line px-4 py-3"><summary className="focus-ring cursor-pointer text-sm text-muted">{translate("todo.assistantHelp")}</summary><div className="mt-4"><AssistantPanel date={getCreationDate(scope, date, weekId)} onTasksCreated={() => setAssistantRefreshKey((current) => current + 1)} /></div></details>
+      <details className="rounded-2xl border border-line px-4 py-3"><summary className="focus-ring cursor-pointer text-sm text-muted">{translate("todo.performanceReview")}</summary><div className="mt-4"><PerformanceStrip refreshKey={tasks} /></div></details>
       {executionTask ? <TodoExecutionDrawer key={executionTask.id} task={executionTask} today={today} onClose={() => setExecutionTask(null)} onSave={saveExecution} /> : null}
 
       <Drawer
@@ -587,53 +651,9 @@ function TaskFieldsEditor({
     onChange({ ...fields, [key]: value });
   }
 
-  function setDescriptionChoice(descriptionChoice: TodoDescriptionChoice): void {
-    onChange({
-      ...fields,
-      descriptionChoice,
-      description: descriptionChoice === "yes" ? fields.description : ""
-    });
-  }
-
   return (
     <div className="space-y-4">
-      <div>
-        <FieldLabel>{translate("todo.name")}</FieldLabel>
-        <TextInput
-          value={fields.title}
-          onChange={(event) => set("title", event.target.value)}
-          className="mt-2"
-          placeholder={translate("todo.namePlaceholder")}
-          required
-        />
-      </div>
-      <fieldset>
-        <legend className="text-sm font-medium text-muted">{translate("todo.descriptionChoice")}</legend>
-        <Segmented aria-label={translate("todo.descriptionChoice")} className="mt-2 w-full">
-          {(["yes", "no"] as const).map((choice) => (
-            <SegmentedButton
-              key={choice}
-              type="button"
-              active={fields.descriptionChoice === choice}
-              onClick={() => setDescriptionChoice(choice)}
-              className="flex-1"
-            >
-              {translate(choice === "yes" ? "todo.yes" : "todo.no")}
-            </SegmentedButton>
-          ))}
-        </Segmented>
-      </fieldset>
-      {fields.descriptionChoice === "yes" ? (
-        <div>
-          <FieldLabel>{translate("todo.descriptionOptional")}</FieldLabel>
-          <TextArea
-            value={fields.description}
-            onChange={(event) => set("description", event.target.value)}
-            className="mt-2 min-h-[96px]"
-            placeholder={translate("todo.descriptionPlaceholder")}
-          />
-        </div>
-      ) : null}
+      <TaskContentEditor fields={fields} onChange={onChange} autoFocus />
       <div className="grid gap-4 md:grid-cols-3">
         <div>
           <FieldLabel>{translate("todo.dateOptional")}</FieldLabel>
@@ -667,6 +687,10 @@ function TaskFieldsEditor({
           showStored={false}
         />
       </div>
+      <details className="rounded-2xl border border-line px-4 py-3">
+        <summary className="focus-ring cursor-pointer text-sm text-muted">{translate("todo.taskDetails")}</summary>
+        <div className="mt-4 space-y-4">
+      <TodoTemplatePanel fields={fields} onChange={onChange} />
       <div className="grid gap-4 md:grid-cols-2">
         <CompanyField
           label={translate("todo.company")}
@@ -762,6 +786,8 @@ function TaskFieldsEditor({
         />
         {translate("todo.productive")}
       </label>
+        </div>
+      </details>
     </div>
   );
 }
@@ -785,14 +811,6 @@ function MultiTaskRowEditor({
     onChange({ ...row, [key]: value });
   }
 
-  function setDescriptionChoice(descriptionChoice: TodoDescriptionChoice): void {
-    onChange({
-      ...row,
-      descriptionChoice,
-      description: descriptionChoice === "yes" ? row.description : ""
-    });
-  }
-
   return (
     <SoftPanel className={`space-y-3 p-4 transition ${row.enabled ? "" : "opacity-50"}`}>
       <div className="flex items-start gap-3">
@@ -804,35 +822,7 @@ function MultiTaskRowEditor({
           aria-label={translate("todo.includeRow")}
         />
         <div className="min-w-0 flex-1 space-y-3">
-          <TextInput
-            value={row.title}
-            onChange={(event) => set("title", event.target.value)}
-            placeholder={translate("todo.taskName")}
-          />
-          <fieldset>
-            <legend className="text-sm font-medium text-muted">{translate("todo.descriptionChoice")}</legend>
-            <Segmented aria-label={translate("todo.descriptionChoice")} className="mt-2 w-full">
-              {(["yes", "no"] as const).map((choice) => (
-                <SegmentedButton
-                  key={choice}
-                  type="button"
-                  active={row.descriptionChoice === choice}
-                  onClick={() => setDescriptionChoice(choice)}
-                  className="flex-1"
-                >
-                  {translate(choice === "yes" ? "todo.yes" : "todo.no")}
-                </SegmentedButton>
-              ))}
-            </Segmented>
-          </fieldset>
-          {row.descriptionChoice === "yes" ? (
-            <TextArea
-              value={row.description}
-              onChange={(event) => set("description", event.target.value)}
-              placeholder={translate("todo.descriptionPlaceholder")}
-              className="min-h-[64px]"
-            />
-          ) : null}
+          <TaskContentEditor fields={row} onChange={(fields) => onChange({ ...row, ...fields })} />
           <div className="grid gap-3 sm:grid-cols-3">
             <TextInput type="date" value={row.date} onChange={(event) => set("date", event.target.value)} />
             <TextInput type="time" value={row.startTime} onChange={(event) => set("startTime", event.target.value)} />

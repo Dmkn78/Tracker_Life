@@ -11,7 +11,7 @@ Le projet est organisé en quatre processus ou services :
 
 ## GitHub et production Ubuntu
 
-La production utilise un VPS Ubuntu. Les modifications passent de `dev_branch` vers `main` par une pull request. Le workflow [`ci.yml`](.github/workflows/ci.yml) vérifie TypeScript, les tests JavaScript et PostgreSQL, les builds web/mobile et la synchronisation Capacitor. Il ne déploie pas sur le VPS. Voir le [circuit Git et production](docs/production-git.md).
+La production utilise un VPS Ubuntu. Les modifications passent de `dev_branch` vers `main` par une pull request. Le workflow [`ci.yml`](.github/workflows/ci.yml) vérifie TypeScript, JavaScript, API/PostgreSQL, audio, builds web/mobile et tests Android. Les pushes validés publient ensuite une APK signée dans GitHub Releases lorsque la clé persistante est configurée dans les secrets. Les [mises à jour Android](docs/android.md) passent par l’API du serveur. Le workflow ne déploie pas sur le VPS. Voir le [circuit Git et production](docs/production-git.md).
 
 FastAPI est la source unique de logique métier. Next.js rend l’interface, gère le cookie de session du navigateur et expose des proxies same-origin très minces. Prisma possède le schéma et les migrations PostgreSQL ; SQLAlchemy permet à FastAPI d’utiliser ce même schéma.
 
@@ -25,6 +25,7 @@ La documentation complète se trouve dans [`docs/README.md`](docs/README.md).
 - Guide de maintenance : [`docs/08-MAINTENANCE-ET-REGLES.md`](docs/08-MAINTENANCE-ET-REGLES.md)
 - Performance, capital fictif et rewards : [`docs/performance-mvp.md`](docs/performance-mvp.md)
 - Objectifs, roadmap, exécution, prévisions et mode crème : [`docs/objectives-planning.md`](docs/objectives-planning.md)
+- Assistant local LM Studio, dictée de tâches et analyses : [`docs/lm-studio-assistant.md`](docs/lm-studio-assistant.md)
 
 ## Démarrage local rapide sous Windows
 
@@ -585,7 +586,7 @@ systemctl restart life-api life-whisper life-web
 
 ## Android — Life Regime
 
-Version Capacitor avec les composants existants, un entonnoir de tâches et une saisie rapide depuis les notifications. Voir [le guide Android](docs/android.md) pour le serveur, le build et l’installation personnelle de l’APK.
+La version 1.0.7 conserve une interface pensée pour le téléphone (cinq onglets, paramètres, notification des tâches) et utilise les API du site. Le build du site publie également cette interface mobile pour la mettre à jour sans refaire sa présentation. Une version intégrée reste disponible si la publication est inaccessible. Voir [le guide Android](docs/android.md) pour la migration, les mises à jour et la compilation.
 
 ```powershell
 npm run build

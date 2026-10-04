@@ -6,11 +6,48 @@ import {
 } from "../../shared/application/serializedWriteCoordinator.ts";
 import { restoreTaskOrder } from "../../shared/application/restoreTaskOrder.ts";
 import {
+  emptyTodoTaskFields,
+  hasTodoTaskContent,
   setTodoTaskImportance,
   setTodoTaskStatus,
   todoTaskFieldsFromTask,
   toTodoTaskWriteValues
 } from "./todoTask.ts";
+import { applyTodoTemplate } from "./todoTemplate.ts";
+
+test("description-only tasks preserve long paragraphs and omit the name", () => {
+  const description = "Mon récit de journée. ".repeat(300) + "\n\nMes idées pour demain.";
+  const fields = { ...emptyTodoTaskFields("2026-10-03"), description };
+  assert.equal(hasTodoTaskContent(fields), true);
+  assert.equal(toTodoTaskWriteValues(fields).title, "");
+  assert.equal(toTodoTaskWriteValues(fields).description, description);
+  assert.equal(hasTodoTaskContent({ ...fields, description: " \n " }), false);
+});
+
+test("day tasks use an automatic title and retain the day option after reopening", () => {
+  const fields = { ...emptyTodoTaskFields("2026-10-03"), isDay: true, title: "Un autre nom" };
+  assert.equal(hasTodoTaskContent(fields), true);
+  assert.equal(toTodoTaskWriteValues(fields).title, "Journée");
+  assert.equal(toTodoTaskWriteValues(fields).isDay, true);
+  assert.equal(todoTaskFieldsFromTask(createTask({ isDay: true })).isDay, true);
+});
+
+test("reusing a day template keeps the new date and resets execution without changing the template", () => {
+  const template = {
+    id: "template-1", name: "Journée de travail",
+    fields: { ...emptyTodoTaskFields("2026-09-30"), isDay: true, description: "Matin : coder\n\nSoir : lire", tagNames: ["Travail"], estimatedMinutes: 120, status: "done", completionPercent: 100, notDoneReason: "Ancien motif" }
+  };
+  const applied = applyTodoTemplate(template, emptyTodoTaskFields("2026-10-03"));
+  assert.equal(applied.date, "2026-10-03");
+  assert.equal(applied.description, template.fields.description);
+  assert.equal(applied.isDay, true);
+  assert.equal(applied.estimatedMinutes, 120);
+  assert.equal(applied.status, "planned");
+  assert.equal(applied.completionPercent, 0);
+  assert.equal(applied.notDoneReason, "");
+  applied.tagNames.push("Nouveau");
+  assert.deepEqual(template.fields.tagNames, ["Travail"]);
+});
 
 function createTask(overrides = {}) {
   return {

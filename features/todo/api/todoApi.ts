@@ -8,6 +8,8 @@ import {
   requestJson
 } from "@/lib/http/apiClient";
 import type { Tag } from "@/features/shared/domain/tagCompany";
+import { defaultObjectiveDraft } from "@/features/objectives/domain/objectiveUi";
+import { getWeekDateKeys } from "@/lib/dates";
 import {
   TODO_IMPORTANCE_LEVELS,
   TODO_STATUSES,
@@ -35,7 +37,7 @@ type ListTodoTasksRangeInput = {
  * explicitly cleared with `null`, `undefined` simply omits the key. */
 export type TaskWritePayload = Partial<TodoTaskWriteValues>;
 
-type CreateTodoTaskItem = TaskWritePayload & { title: string };
+type CreateTodoTaskItem = TaskWritePayload;
 type CreateTodoTasksInput = { items: CreateTodoTaskItem[] };
 type UpdateTodoTaskInput = { id: string } & TaskWritePayload & { sortOrder?: number };
 
@@ -70,6 +72,23 @@ export function createTodoTasks(input: CreateTodoTasksInput): Promise<TodoTask[]
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input)
+  });
+}
+
+export function createWeeklyTodoObjective(input: { title: string; weekId: string }): Promise<ObjectiveOption> {
+  const weekDays = getWeekDateKeys(input.weekId);
+  return requestJson("/api/objectives", (payload) => {
+    const response = expectJsonObject(payload, "created objective response");
+    const created = expectJsonObject(response.objective, "created objective response.objective");
+    const objectiveId = expectString(created.id, "created objective response.objective.id");
+    const options = parseObjectiveOptionsResponse(response.data);
+    const objective = options.find((option) => option.id === objectiveId);
+    if (!objective) throw new Error("The created objective is missing from the response");
+    return objective;
+  }, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...defaultObjectiveDraft(), ...input, horizon: "week", targetDate: weekDays[weekDays.length - 1] })
   });
 }
 
@@ -130,7 +149,9 @@ function parseObjectiveOptionsResponse(payload: unknown): ObjectiveOption[] {
       id: expectString(record.id, `${context}.id`),
       title: expectString(record.title, `${context}.title`),
       horizon: expectString(record.horizon, `${context}.horizon`),
-      color: expectString(record.color, `${context}.color`)
+      color: expectString(record.color, `${context}.color`),
+      weekId: expectOptionalNullableString(record.weekId, `${context}.weekId`),
+      targetDate: expectOptionalNullableString(record.targetDate, `${context}.targetDate`)
     };
   });
 }
@@ -149,6 +170,7 @@ function parseTodoTask(payload: unknown, context: string): TodoTask {
       return { id: expectString(session.id, location), date: expectString(session.date, location), executionStatus: expectString(session.executionStatus, location), actualMinutes: session.actualMinutes === null ? null : expectNumber(session.actualMinutes, location) };
     }),
     title: expectString(task.title, `${context}.title`),
+    isDay: task.isDay === undefined ? false : expectBoolean(task.isDay, `${context}.isDay`),
     description: expectOptionalNullableString(task.description, `${context}.description`) ?? null,
     date: expectOptionalNullableString(task.date, `${context}.date`) ?? null,
     startTime: expectOptionalNullableString(task.startTime, `${context}.startTime`) ?? null,

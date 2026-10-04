@@ -14,6 +14,7 @@ from ..core.scoring import recompute_around_date
 from ..core.completion import record_completion
 from ..core.objective_progress import record_objective_progress
 from ..core.performance_work import recorded_day_minutes
+from ..core.task_content import has_task_content, resolve_task_title
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -64,6 +65,7 @@ def serialize_task(
         "id": task.id,
         "userId": task.userId,
         "title": task.title,
+        "isDay": bool(task.isDay),
         "description": task.description,
         "date": task.date.isoformat() if task.date else None,
         "startTime": task.startTime,
@@ -147,13 +149,14 @@ def list_tasks(
     }
 
 
-def _create_one_task(db: Session, user: User, item) -> Task:
+def _create_one_task(db: Session, user: User, item: TaskItem) -> Task:
     _validate_objective_access(db, user.id, item.objective_id)
     company_id = resolve_company_id(db, user.id, item.company_id, item.company_name)
     tag_ids = resolve_tag_ids(db, user.id, item.tag_ids, item.tag_names)
     task = Task(
         userId=user.id,
-        title=item.title.strip() or "Untitled task",
+        title=resolve_task_title(item.title, item.description, item.is_day),
+        isDay=item.is_day,
         description=item.description,
         date=item.date,
         startTime=item.start_time,
@@ -181,7 +184,9 @@ def create_tasks(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    items = [item for item in body.resolve_items() if item.title.strip()]
+    items = [item for item in body.resolve_items() if has_task_content(item.title, item.description, item.is_day)]
+    if not items:
+        raise HTTPException(status_code=400, detail="Add a name, a description, or select Journée")
     tasks = [_create_one_task(db, user, item) for item in items]
     db.flush()
     for date_key in {task.date.isoformat() for task in tasks if task.date}:
@@ -205,10 +210,15 @@ def update_task(
 
     previous_status = existing.status
     provided_fields = body.model_fields_set
-    if body.title is not None:
-        existing.title = body.title
+    if body.is_day is not None:
+        existing.isDay = body.is_day
     if "description" in provided_fields:
         existing.description = body.description
+    if "title" in provided_fields or "is_day" in provided_fields:
+        requested_title = body.title if "title" in provided_fields else existing.title
+        if not has_task_content(requested_title, existing.description, existing.isDay):
+            raise HTTPException(status_code=400, detail="Add a name, a description, or select Journée")
+        existing.title = resolve_task_title(requested_title, existing.description, existing.isDay)
     if "date" in provided_fields:
         existing.date = body.date
     if "start_time" in provided_fields:

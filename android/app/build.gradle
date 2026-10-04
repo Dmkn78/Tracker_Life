@@ -1,14 +1,29 @@
 apply plugin: 'com.android.application'
 
+def releaseVersionCode = System.getenv('ANDROID_VERSION_CODE') ?: '9'
+def releaseVersionName = System.getenv('ANDROID_VERSION_NAME') ?: '1.0.8'
+if (!(releaseVersionCode ==~ /[1-9][0-9]*/) || releaseVersionCode.toLong() > 2100000000L) {
+    throw new GradleException('ANDROID_VERSION_CODE must be a positive Android version code.')
+}
+if (!(releaseVersionName ==~ /[0-9]+\.[0-9]+\.[0-9]+/)) {
+    throw new GradleException('ANDROID_VERSION_NAME must have the form major.minor.patch.')
+}
+def signingEnvironment = ['ANDROID_KEYSTORE_PATH', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD']
+def hasReleaseSigning = signingEnvironment.every { System.getenv(it) }
+if (signingEnvironment.any { System.getenv(it) } && !hasReleaseSigning) {
+    throw new GradleException('All four Android signing environment variables are required together.')
+}
+
 android {
     namespace = "app.liferegime.personal"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures { buildConfig = true }
     defaultConfig {
         applicationId "app.liferegime.personal"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode releaseVersionCode.toInteger()
+        versionName releaseVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,12 +31,34 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(System.getenv('ANDROID_KEYSTORE_PATH'))
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseSigning) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+}
+
+def validateReleaseSigning = tasks.register('validateReleaseSigning') {
+    doLast {
+        if (!hasReleaseSigning) {
+            throw new GradleException('Release builds require the persistent Android signing key. Set the four Android signing environment variables.')
+        }
+    }
+}
+tasks.matching { it.name == 'preReleaseBuild' }.configureEach {
+    dependsOn validateReleaseSigning
 }
 
 repositories {
@@ -36,6 +73,7 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    implementation "androidx.webkit:webkit:$androidxWebkitVersion"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
