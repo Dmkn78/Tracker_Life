@@ -18,6 +18,9 @@ if (!manifest.includes("android.permission.RECORD_AUDIO")) {
 if (!manifest.includes("android.permission.POST_NOTIFICATIONS")) {
   manifest = manifest.replace("<application", '<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <application');
 }
+if (!manifest.includes("android.permission.MODIFY_AUDIO_SETTINGS")) {
+  manifest = manifest.replace("<application", '<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <application');
+}
 manifest = manifest.replace('android:allowBackup="true"', 'android:allowBackup="false"');
 manifest = manifest.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/life_regime_mark"');
 manifest = manifest.replace('android:roundIcon="@mipmap/ic_launcher_round"', 'android:roundIcon="@drawable/life_regime_mark"');

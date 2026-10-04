@@ -78,9 +78,12 @@ Documentation OpenAPI : `http://127.0.0.1:8000/docs`.
 | `GET` | `/api/life-terminal` | read model du terminal |
 | `POST` | `/api/assistant/models` | découverte authentifiée des modèles LM Studio |
 | `POST` | `/api/assistant/preview` | propositions de tâches ou analyse jour/7 jours, sans écriture |
-| `POST` | `/api/transcribe` | relais authentifié vers Whisper |
+| `POST` | `/api/transcribe` | transcription authentifiée via Parakeet V3 local |
+| `POST` | `/api/transcription-jobs` | envoi audio pour une transcription asynchrone, jusqu’à 30 minutes / 100 Mo |
+| `GET, DELETE` | `/api/transcription-jobs/{job_id}` | progression/résultat et annulation d’une transcription privée |
+| `GET` | `/api/mobile-update`, `/api/mobile-update/apk/{digest}` | manifeste et APK Android publics, relayés depuis GitHub si configuré |
 
-Toutes les routes sauf health et login exigent normalement une session ; logout peut effacer un cookie sans session valide.
+Les routes métier et de transcription exigent une session. Health, login et les publications Android sont publics ; logout peut effacer un cookie sans session valide.
 
 ## Schéma et migrations
 
@@ -107,4 +110,4 @@ Ou depuis `interface_API` :
 python -m unittest discover -s tests -v
 ```
 
-Les tests présents couvrent contrats, sécurité de session, parité numérique et quelques frontières HTTP. Ils ne couvrent pas encore une vraie base PostgreSQL.
+Les tests couvrent contrats, sécurité de session, parité numérique, assistants, transcription et mises à jour Android. Les vérifications PostgreSQL utilisent des transactions annulées et s’activent avec `RUN_DATABASE_TESTS=1` ; la CI les exécute sur une base isolée après les migrations Prisma.

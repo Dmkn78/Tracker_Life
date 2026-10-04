@@ -4,8 +4,8 @@
 #   - repo checked out at REPO_DIR with an SSH remote backed by a GitHub deploy key,
 #     so `git fetch` runs unattended against the private repo
 #   - node/pnpm on PATH, and interface_API/.venv already created
-#   - systemd units life-api and life-web installed and enabled
-#   - passwordless sudo for `systemctl restart life-api life-web` for the deploy user
+#   - systemd units interface-api-backend and life-web installed and enabled
+#   - passwordless sudo for restarting the configured API and web services
 #
 # Both apps load their own .env files (Next.js natively, FastAPI via load_dotenv in
 # interface_API/app/config.py), so the systemd units need no EnvironmentFile.
@@ -16,6 +16,8 @@ set -euo pipefail
 REPO_DIR="${REPO_DIR:-/opt/interface_API}"
 TARGET_REF="${1:?Usage: deploy.sh <git-sha-or-ref>}"
 LOCK_FILE="/tmp/life-regime-deploy.lock"
+API_SERVICE="${API_SERVICE:-interface-api-backend}"
+WEB_SERVICE="${WEB_SERVICE:-life-web}"
 
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
@@ -38,7 +40,7 @@ echo "Current commit: $PREVIOUS_SHA"
 echo "Deploying:      $TARGET_REF"
 
 restart_services() {
-  sudo systemctl restart life-api life-web
+  sudo systemctl restart "$API_SERVICE" "$WEB_SERVICE"
 }
 
 health_check() {
@@ -75,6 +77,9 @@ if ! git diff --quiet "$PREVIOUS_SHA" "$TARGET_REF" -- interface_API/requirement
   echo "interface_API/requirements.txt changed, reinstalling."
   interface_API/.venv/bin/pip install -r interface_API/requirements.txt
 fi
+
+# The authenticated API starts a short-lived local Parakeet worker per recording.
+python3 scripts/install-parakeet.py
 
 # Restarting through systemd (rather than nohup) is what keeps the served HTML in
 # sync with the freshly hashed .next/static assets: a surviving old process would

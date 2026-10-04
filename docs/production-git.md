@@ -17,7 +17,11 @@ Une PR avec **base: dev_branch** et **compare: main** ne publie pas les fonction
 
 Le workflow `.github/workflows/ci.yml` teste les pushes sur `main` et `dev_branch`, ainsi que les PR vers `main`. Il applique toutes les migrations à une base PostgreSQL éphémère et exécute les tests d’intégration, puis les builds Next.js et mobile et `cap sync android`.
 
-Un contrôle vert indique que le code est validé. Il ne signifie pas que le VPS a changé de version. Il ne compile pas non plus un APK natif Android.
+Le job de validation teste aussi la segmentation audio, le packaging et les classes Android avec Java 21 et le SDK 36. Après validation d’un push sur `main` ou `dev_branch`, le job `Publish signed Android update` appelle `.github/workflows/android-release.yml` pour publier une APK signée et son manifeste dans GitHub Releases. Une pull request ne publie aucune APK.
+
+La clé persistante doit être configurée dans les quatre secrets Android décrits dans [android.md](android.md). Une clé manquante fait échouer explicitement la publication. Le serveur API doit être déployé avec `MOBILE_GITHUB_REPOSITORY` et un `MOBILE_GITHUB_TOKEN` privé limité à la lecture du dépôt pour proposer ces releases au téléphone.
+
+Un contrôle vert ne signifie pas que le VPS a changé de version. La publication Android et le déploiement web/API sont distincts.
 
 L’ancien workflow IIS a été retiré : il ciblait un autre système et pouvait ignorer entièrement le déploiement tout en terminant en succès. Aucun runner, secret de connexion ou adresse du VPS n’est requis pour les contrôles actuels.
 
@@ -34,4 +38,4 @@ git rev-parse HEAD
 
 Si des changements locaux ou une divergence empêchent le pull, les examiner avant de continuer ; ne pas utiliser de reset ou de push forcé. Mettre à jour Git ne reconstruit pas l’application et ne redémarre pas les services.
 
-La procédure complète Ubuntu reste dans le README. Le script `scripts/deploy.sh` est destiné à une installation existante avec les services `life-api` et `life-web`, les environnements privés et la base configurés. Son exécution sur le VPS est distincte du merge GitHub. Le déploiement automatique pourra être relié au serveur lorsque son accès aura été configuré explicitement.
+La procédure complète Ubuntu reste dans le README. Le script `scripts/deploy.sh` est destiné à une installation existante avec les services `interface-api-backend` et `life-web` (remplaçables par `API_SERVICE` et `WEB_SERVICE`), les environnements privés et la base configurés. Son exécution sur le VPS est distincte du merge GitHub. Le déploiement automatique pourra être relié au serveur lorsque son accès aura été configuré explicitement.

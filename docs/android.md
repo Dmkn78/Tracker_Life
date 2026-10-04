@@ -10,7 +10,7 @@ L’APK embarque une interface mobile fonctionnelle, dont la dictée actuelle à
 
 ## Installer et connecter
 
-Installer `Life-Regime-1.0.7.apk` **par-dessus** l’ancienne version, avec la même signature. Le serveur déjà enregistré et les captures SQLite restent conservés. Les préférences de l’ancienne interface mobile sont récupérées lorsque présentes. Une reconnexion peut être nécessaire si la session a expiré.
+Installer l’APK **1.0.8 par-dessus** l’ancienne version, avec la même signature. Le serveur déjà enregistré et les captures SQLite restent conservés. Les préférences de l’ancienne interface mobile sont récupérées lorsque présentes. Une reconnexion peut être nécessaire si la session a expiré.
 
 Dans **Réglages → Connexion à mes données**, utiliser l’adresse du site ou de l’API et la clé habituelle. Les tâches, logs et objectifs restent sur le serveur. L’application vérifie la session avant de se déclarer connectée. Les thèmes et le formulaire de connexion restent accessibles si le serveur est indisponible.
 
