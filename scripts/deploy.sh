@@ -48,7 +48,9 @@ health_check() {
   sleep 3
   curl -fsS http://127.0.0.1:8000/api/health >/dev/null || return 1
   curl -fsS -o /dev/null "$WEB_HEALTH_URL" || return 1
-  local verification_options=(--expected-version "$(cat .next/BUILD_ID)")
+  local expected_version
+  expected_version="$(cat .next/BUILD_ID)" || return 1
+  local verification_options=(--expected-version "$expected_version")
   if [[ "$REQUIRE_ANDROID_UPDATE" == "1" ]]; then
     verification_options+=(--require-apk)
   fi
