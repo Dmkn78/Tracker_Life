@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Reproducible production deploy, run ON THE VPS (over SSH from the GitHub Actions
-# workflow at .github/workflows/deploy.yml). One-time VPS setup this script assumes:
+# Reproducible production deploy, run ON THE VPS. One-time VPS setup this script assumes:
 #   - repo checked out at REPO_DIR with an SSH remote backed by a GitHub deploy key,
 #     so `git fetch` runs unattended against the private repo
 #   - node/pnpm on PATH, and interface_API/.venv already created
@@ -18,6 +17,8 @@ TARGET_REF="${1:?Usage: deploy.sh <git-sha-or-ref>}"
 LOCK_FILE="/tmp/life-regime-deploy.lock"
 API_SERVICE="${API_SERVICE:-interface-api-backend}"
 WEB_SERVICE="${WEB_SERVICE:-life-web}"
+WEB_HEALTH_URL="${WEB_HEALTH_URL:-http://127.0.0.1:3000}"
+REQUIRE_ANDROID_UPDATE="${REQUIRE_ANDROID_UPDATE:-0}"
 
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
@@ -45,8 +46,13 @@ restart_services() {
 
 health_check() {
   sleep 3
-  curl -fsS http://127.0.0.1:8000/api/health >/dev/null
-  curl -fsS -o /dev/null http://127.0.0.1:3000
+  curl -fsS http://127.0.0.1:8000/api/health >/dev/null || return 1
+  curl -fsS -o /dev/null "$WEB_HEALTH_URL" || return 1
+  local verification_options=(--expected-version "$(cat .next/BUILD_ID)")
+  if [[ "$REQUIRE_ANDROID_UPDATE" == "1" ]]; then
+    verification_options+=(--require-apk)
+  fi
+  python3 scripts/verify-mobile-publication.py "$WEB_HEALTH_URL" "${verification_options[@]}"
 }
 
 build_current_checkout() {

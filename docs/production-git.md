@@ -39,3 +39,21 @@ git rev-parse HEAD
 Si des changements locaux ou une divergence empêchent le pull, les examiner avant de continuer ; ne pas utiliser de reset ou de push forcé. Mettre à jour Git ne reconstruit pas l’application et ne redémarre pas les services.
 
 La procédure complète Ubuntu reste dans le README. Le script `scripts/deploy.sh` est destiné à une installation existante avec les services `interface-api-backend` et `life-web` (remplaçables par `API_SERVICE` et `WEB_SERVICE`), les environnements privés et la base configurés. Son exécution sur le VPS est distincte du merge GitHub. Le déploiement automatique pourra être relié au serveur lorsque son accès aura été configuré explicitement.
+
+## Vérifier une livraison pour le téléphone
+
+Le site doit publier `/mobile-app/release.json`, `/mobile-app/index.html` et ses fichiers JavaScript/CSS, ainsi que `/api/mobile-update` et l'APK référencée. Une réponse correcte de la page de connexion ne suffit pas. `scripts/deploy.sh` vérifie désormais ces ressources et le même identifiant de build pour le site en cours d'exécution et l'interface mobile. Lorsqu'une APK est publiée, le contrôle la télécharge et vérifie son SHA256 et sa taille avant de valider le déploiement.
+
+Pour la première mise en service des mises à jour, publier d'abord une APK signée compatible. L'API peut utiliser la release GitHub avec sa configuration privée, ou une copie locale de l'APK nommée par son SHA256 dans `.runtime/mobile-release/` (ou `MOBILE_RELEASE_DIR`). Pour cette seconde option, ne pas configurer `MOBILE_GITHUB_REPOSITORY` : cette variable sélectionne le fournisseur GitHub. Copier `release.json` en dernier, après l'APK, pour éviter une publication incomplète. Aucune clé de signature n'est nécessaire sur le VPS.
+
+Sur un VPS déjà configuré avec les services attendus :
+
+```bash
+cd /opt/interface_API
+REQUIRE_ANDROID_UPDATE=1 bash scripts/deploy.sh origin/main
+python3 scripts/verify-mobile-publication.py https://ADRESSE_DU_SITE --require-apk
+```
+
+`REQUIRE_ANDROID_UPDATE=1` fait échouer le contrôle si aucune APK n'est proposée. `WEB_HEALTH_URL` permet de vérifier une origine différente de `http://127.0.0.1:3000`, notamment l'adresse publique derrière Nginx. Le contrôle détecte aussi une interface provenant d'un ancien build, des assets manquants, un HTML de connexion servi à la place du JavaScript et une APK trop ancienne pour l'interface publiée. Les tests du contrôleur se lancent avec `python -m unittest discover -s scripts -p test_verify_mobile_publication.py`.
+
+Le mot de passe de connexion à l'application ne donne pas accès au déploiement. Un accès SSH valide au VPS reste nécessaire pour mettre à jour le code, les fichiers publiés et les processus serveur.

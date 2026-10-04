@@ -84,6 +84,8 @@ jobs:
           pnpm test:time-allocation
           pnpm test:mobile
           node --test scripts/package-android-release.test.mjs
+          python -m unittest discover -s scripts -p test_verify_mobile_publication.py -v
+          bash -n scripts/deploy.sh
       - name: Run API tests including PostgreSQL integration
         working-directory: interface_API
         run: python -m unittest discover -s tests -v
