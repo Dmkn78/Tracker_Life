@@ -8,14 +8,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..contracts.assistant import (
     AssistantMode,
-    AssistantModelsRequest,
-    AssistantModelsResponse,
     AssistantPreviewRequest,
     AssistantPreviewResponse,
 )
-from ..core.lm_studio import ProviderError, generate_preview, list_models, validate_provider_url
+from ..core.ai.errors import AiProviderError
+from ..core.ai_provider_store import resolve_active_connection
+from ..core.assistant_preview import generate_preview
 from ..database import get_db
 from ..models import DailyLog, Task, User
 from ..security import get_current_user
@@ -34,15 +35,6 @@ LOG_TEXT_FIELDS = ("mainBlocker", "improvementTomorrow", "textSummary", "voiceTr
 LOG_LIST_FIELDS = ("wins", "topImprovements", "blockers", "tomorrowPriorities", "tags")
 
 
-@router.post("/models", response_model=AssistantModelsResponse)
-async def discover_models(body: AssistantModelsRequest, user: User = Depends(get_current_user)) -> AssistantModelsResponse:
-    try:
-        models = await list_models(body.provider)
-        return AssistantModelsResponse(models=models)
-    except ProviderError as error:
-        raise HTTPException(status_code=error.status_code, detail=error.message) from error
-
-
 @router.post("/preview", response_model=AssistantPreviewResponse)
 async def preview_assistant(
     body: AssistantPreviewRequest,
@@ -50,13 +42,13 @@ async def preview_assistant(
     db: Session = Depends(get_db),
 ) -> AssistantPreviewResponse:
     try:
-        # Validate before reading private journal data, including when the transport is mocked.
-        validate_provider_url(body.provider.base_url)
+        # Resolve the provider before reading private journal data.
+        connection = resolve_active_connection(db, user.id, get_settings().provider_key_secret, body.provider_id)
         start, end = analysis_period(body.date, body.mode)
         context = build_analysis_context(user.id, body.date, body.mode, db) if body.mode != "tasks" else {}
-        proposal = await generate_preview(body.provider, body.prompt, body.date, body.mode, context)
+        proposal = await generate_preview(connection, body.prompt, body.date, body.mode, context)
         return AssistantPreviewResponse(analysis=proposal.analysis, tasks=proposal.tasks, from_date=start.isoformat(), to=end.isoformat())
-    except ProviderError as error:
+    except AiProviderError as error:
         raise HTTPException(status_code=error.status_code, detail=error.message) from error
 
 
@@ -65,7 +57,7 @@ def analysis_period(date_key: str, mode: AssistantMode) -> tuple[Date, Date]:
     try:
         start = end - timedelta(days=6) if mode == "week" else end
     except OverflowError as error:
-        raise ProviderError(400, "La date sélectionnée ne permet pas de calculer cette période.") from error
+        raise AiProviderError(400, "La date sélectionnée ne permet pas de calculer cette période.") from error
     return start, end
 
 

@@ -6,22 +6,20 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, patch
 
-import httpx
 from fastapi.testclient import TestClient
 from sqlalchemy import JSON, MetaData, create_engine, func, select
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.core import lm_studio
-from app.contracts.assistant import ProviderSettings
+from app.core.ai.adapters import openai_adapter
+from app.core.ai.errors import AiProviderError
 from app.database import get_db
 from app.main import app
-from app.models import DailyLog, Task, User
+from app.models import AiProvider, DailyLog, Task, User
 from app.security import get_current_user
 
 
-PROVIDER = {"baseUrl": "http://127.0.0.1:1234/v1", "model": "local-test-model"}
 SELECTED_DATE = "2026-10-01"
 GENERATED_TASK = {
     "title": "Préparer le rapport",
@@ -43,6 +41,7 @@ class AssistantApiTests(unittest.TestCase):
         metadata = MetaData()
         User.__table__.to_metadata(metadata)
         Task.__table__.to_metadata(metadata)
+        AiProvider.__table__.to_metadata(metadata)
         self.logs_table = DailyLog.__table__.to_metadata(metadata)
         for column in self.logs_table.columns:
             if isinstance(column.type, (ARRAY, JSONB)):
@@ -53,7 +52,12 @@ class AssistantApiTests(unittest.TestCase):
         app.dependency_overrides[get_current_user] = lambda: self.user
         app.dependency_overrides[get_db] = lambda: self.db
         self.client = TestClient(app)
-        self.provider_request = patch.object(lm_studio, "_request_json", new_callable=AsyncMock)
+        self.db.add(AiProvider(
+            userId=self.user.id, kind="lmstudio", label="LM Studio", baseUrl="http://127.0.0.1:1234/v1",
+            model="local-test-model", isDefault=True,
+        ))
+        self.db.flush()
+        self.provider_request = patch.object(openai_adapter, "request_provider_json", new_callable=AsyncMock)
         self.mock_provider = self.provider_request.start()
         self.return_generation()
 
@@ -73,7 +77,6 @@ class AssistantApiTests(unittest.TestCase):
 
     def preview(self, **changes):
         return self.client.post("/api/assistant/preview", json={
-            "provider": PROVIDER,
             "prompt": "Prépare le rapport jeudi à 10 heures.",
             "date": SELECTED_DATE,
             "mode": "tasks",
@@ -92,17 +95,8 @@ class AssistantApiTests(unittest.TestCase):
         self.db.flush()
 
     def provider_payload(self) -> str:
-        request_arguments = self.mock_provider.await_args
-        return json.dumps({"args": request_arguments.args[1:], "kwargs": request_arguments.kwargs}, default=str)
-
-    def test_models_are_discovered_from_the_configured_provider(self) -> None:
-        self.mock_provider.return_value = {"data": [{"id": "model-a"}, {"id": "model-b"}]}
-
-        response = self.client.post("/api/assistant/models", json={"provider": PROVIDER})
-
-        self.assertEqual(response.status_code, 200, response.text)
-        self.assertEqual(response.json(), {"models": ["model-a", "model-b"]})
-        self.assertIn("models", self.mock_provider.await_args.args[1])
+        provider_request = self.mock_provider.await_args.args[0]
+        return json.dumps(provider_request.payload, default=str)
 
     def test_preview_returns_tasks_without_creating_or_changing_records(self) -> None:
         self.seed_task(self.user.id, SELECTED_DATE, "Tâche existante")
@@ -213,7 +207,7 @@ class AssistantApiTests(unittest.TestCase):
         response = self.preview(mode="week")
 
         self.assertEqual(response.status_code, 200, response.text)
-        payload = self.mock_provider.await_args.args[2]
+        payload = self.mock_provider.await_args.args[0].payload
         context = json.loads(payload["messages"][1]["content"])["contexte"]
         self.assertEqual(len(context["days"]), 7)
         self.assertTrue(context["tasksTruncated"])
@@ -223,98 +217,39 @@ class AssistantApiTests(unittest.TestCase):
         self.assertIsNone(context["days"][0]["journal"])
         self.assertTrue(context["days"][-1]["journalPresent"])
 
-    def test_unsafe_provider_urls_never_receive_prompt_or_credentials(self) -> None:
-        for base_url in (
-            "https://example.com/v1", "http://169.254.169.254/v1", "file:///tmp/model",
-            "http://user:password@127.0.0.1:1234/v1", "http://127.0.0.1:1234/v1?key=secret",
-        ):
-            with self.subTest(base_url=base_url):
-                response = self.preview(provider={**PROVIDER, "baseUrl": base_url})
-                self.assertIn(response.status_code, (400, 422), response.text)
+    def test_preview_without_configured_provider_explains_how_to_configure_one(self) -> None:
+        self.db.query(AiProvider).delete()
+        self.db.flush()
+
+        response = self.preview()
+
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertIn("Réglages", response.json()["error"])
         self.mock_provider.assert_not_awaited()
+
+    def test_preview_uses_the_stored_model(self) -> None:
+        response = self.preview()
+
+        self.assertEqual(response.status_code, 200, response.text)
+        provider_request = self.mock_provider.await_args.args[0]
+        self.assertEqual(provider_request.url, "http://127.0.0.1:1234/v1/chat/completions")
+        self.assertEqual(provider_request.payload["model"], "local-test-model")
 
     def test_provider_errors_have_safe_messages(self) -> None:
         for status_code in (503, 504):
             with self.subTest(status_code=status_code):
-                self.mock_provider.side_effect = lm_studio.ProviderError(status_code, "LM Studio unavailable")
-                response = self.preview(provider={**PROVIDER, "apiKey": "PRIVATE_API_KEY"})
+                self.mock_provider.side_effect = AiProviderError(status_code, "LM Studio unavailable")
+                response = self.preview()
                 self.assertEqual(response.status_code, status_code, response.text)
                 self.assertNotIn("PRIVATE_API_KEY", response.text)
 
-    def test_both_assistant_endpoints_require_authentication(self) -> None:
+    def test_assistant_preview_requires_authentication(self) -> None:
         app.dependency_overrides.pop(get_current_user)
 
         preview_response = self.preview()
-        models_response = self.client.post("/api/assistant/models", json={"provider": PROVIDER})
 
         self.assertEqual(preview_response.status_code, 401)
-        self.assertEqual(models_response.status_code, 401)
         self.mock_provider.assert_not_awaited()
-
-
-class AssistantTransportTests(unittest.IsolatedAsyncioTestCase):
-    async def request_provider(self, handler, **provider_changes):
-        client_class = httpx.AsyncClient
-        transport = httpx.MockTransport(handler)
-        provider = ProviderSettings(**{**PROVIDER, **provider_changes})
-        with patch.object(lm_studio.httpx, "AsyncClient", side_effect=lambda **options: client_class(transport=transport, **options)) as client_factory:
-            response = await lm_studio._request_json(provider, "models")
-            return response, client_factory.call_args.kwargs
-
-    async def test_localhost_is_canonicalized_and_credentials_are_sent_only_to_provider(self) -> None:
-        def respond(request):
-            self.assertEqual(str(request.url), "http://127.0.0.1:1234/v1/models")
-            self.assertEqual(request.headers["Authorization"], "Bearer test-provider-key")
-            return httpx.Response(200, json={"data": []})
-
-        response, options = await self.request_provider(
-            respond, baseUrl="http://localhost:1234", apiKey="test-provider-key"
-        )
-
-        self.assertEqual(response, {"data": []})
-        self.assertFalse(options["trust_env"])
-        self.assertFalse(options["follow_redirects"])
-        self.assertEqual(options["timeout"].connect, 5)
-
-    async def test_timeout_is_safe_and_actionable(self) -> None:
-        def timeout(request):
-            raise httpx.ReadTimeout("PRIVATE_API_KEY in upstream error", request=request)
-
-        with self.assertRaises(lm_studio.ProviderError) as raised:
-            await self.request_provider(timeout)
-
-        self.assertEqual(raised.exception.status_code, 504)
-        self.assertNotIn("PRIVATE_API_KEY", raised.exception.message)
-
-    async def test_connection_error_is_safe_and_actionable(self) -> None:
-        def unavailable(request):
-            raise httpx.ConnectError("PRIVATE_API_KEY in upstream error", request=request)
-
-        with self.assertRaises(lm_studio.ProviderError) as raised:
-            await self.request_provider(unavailable)
-
-        self.assertEqual(raised.exception.status_code, 503)
-        self.assertNotIn("PRIVATE_API_KEY", raised.exception.message)
-
-    async def test_redirect_is_not_followed_and_upstream_errors_do_not_leak(self) -> None:
-        for status_code in (302, 401, 500):
-            requests = []
-
-            def rejected(request):
-                requests.append(request)
-                return httpx.Response(status_code, headers={"Location": "http://example.com"}, text="PRIVATE_UPSTREAM_BODY")
-
-            with self.subTest(status_code=status_code), self.assertRaises(lm_studio.ProviderError) as raised:
-                await self.request_provider(rejected)
-            self.assertEqual(raised.exception.status_code, 502)
-            self.assertNotIn("PRIVATE_UPSTREAM_BODY", raised.exception.message)
-            self.assertEqual(len(requests), 1)
-
-    async def test_invalid_and_oversized_provider_json_are_rejected(self) -> None:
-        for body in (b"not json", b"[]", b"x" * (lm_studio.MAX_PROVIDER_RESPONSE_BYTES + 1)):
-            with self.subTest(length=len(body)), self.assertRaises(lm_studio.ProviderError) as raised:
-                await self.request_provider(lambda request: httpx.Response(200, content=body))
-            self.assertEqual(raised.exception.status_code, 502)
 
 
 if __name__ == "__main__":

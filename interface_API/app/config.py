@@ -16,6 +16,7 @@ DEFAULT_FRONTEND_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
 DEFAULT_WHISPER_SERVICE_URL = "http://127.0.0.1:8001/transcribe"
 DEVELOPMENT_ACCESS_KEY = "dev-access-key"
 DEVELOPMENT_SIGNING_SECRET = "dev-only-life-regime-secret"
+DEFAULT_KNOWLEDGE_VAULT_DIR = BASE_DIR.parent / "data" / "vault"
 
 load_dotenv(BASE_DIR / ".env")
 # Fall back to the repository root .env (shared with the Next.js app) for
@@ -60,10 +61,17 @@ class Settings:
     max_audio_bytes: int
     whisper_timeout_seconds: int
     is_production: bool
+    ai_keys_secret: str
+    knowledge_vault_dir: Path
 
     @property
     def signing_secret(self) -> str:
         return self.auth_secret or self.app_access_key or DEVELOPMENT_SIGNING_SECRET
+
+    @property
+    def provider_key_secret(self) -> str:
+        """Secret used to encrypt stored AI provider keys; rotating it invalidates them."""
+        return self.ai_keys_secret or self.signing_secret
 
     @property
     def access_key(self) -> str:
@@ -110,4 +118,6 @@ def get_settings() -> Settings:
         max_audio_bytes=_read_positive_integer("MAX_AUDIO_BYTES", 100 * 1024 * 1024),
         whisper_timeout_seconds=_read_positive_integer("WHISPER_TIMEOUT_SECONDS", 180),
         is_production=is_production,
+        ai_keys_secret=os.environ.get("AI_KEYS_SECRET", ""),
+        knowledge_vault_dir=Path(os.environ.get("KNOWLEDGE_VAULT_DIR", str(DEFAULT_KNOWLEDGE_VAULT_DIR))).expanduser(),
     )
