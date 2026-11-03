@@ -55,7 +55,12 @@ def search_vault(
 ) -> dict:
     query = SearchQuery(text=q, now_timestamp=time.time(), note_types=frozenset(note_type), date_from=date_from, date_to=date_to, limit=limit)
     hits = search_notes(load_search_index(store), query)
-    return {"results": [hit.__dict__ for hit in hits]}
+    results = [
+        {"path": hit.path, "title": hit.title, "noteType": hit.note_type, "dateKey": hit.date_key,
+         "excerpt": hit.excerpt, "heading": hit.heading, "reasons": hit.reasons}
+        for hit in hits
+    ]
+    return {"results": results}
 
 
 @router.post("/notes")

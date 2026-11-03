@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import time
-from dataclasses import asdict
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -33,7 +31,11 @@ router = APIRouter(prefix="/api/ai-providers", tags=["ai-providers"])
 @router.get("")
 def list_providers(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     providers = [serialize_provider(provider) for provider in list_user_providers(db, user.id)]
-    presets = [asdict(preset) for preset in PROVIDER_PRESETS.values()]
+    presets = [
+        {"kind": preset.kind, "label": preset.label, "defaultBaseUrl": preset.default_base_url,
+         "requiresApiKey": preset.requires_api_key, "isLocal": preset.is_local}
+        for preset in PROVIDER_PRESETS.values()
+    ]
     return {"providers": providers, "presets": presets}
 
 

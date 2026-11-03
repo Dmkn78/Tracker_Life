@@ -17,6 +17,7 @@ from .routers import (
     companies,
     daily_log,
     emotional_reviews,
+    goals,
     habits,
     history,
     insights,
@@ -125,3 +126,4 @@ app.include_router(thinking_notes.router)
 app.include_router(week.router)
 app.include_router(knowledge.router)
 app.include_router(insights.router)
+app.include_router(goals.router)

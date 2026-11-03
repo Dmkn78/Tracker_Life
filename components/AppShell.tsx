@@ -4,10 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  BookOpen,
+  CalendarCheck,
   CalendarDays,
   CheckSquare,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Clock3,
   FolderKanban,
   Home,
@@ -20,6 +23,8 @@ import {
   Repeat2,
   Settings,
   SlidersHorizontal,
+  Sparkles,
+  Target,
   X
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -28,22 +33,34 @@ import { LocaleControl } from "@/features/interface/components/LocaleControl";
 import { useLocale } from "@/features/interface/localization/LocaleProvider";
 import type { TranslationKey } from "@/features/interface/localization/messages";
 
-const NAVIGATION_ITEMS = [
-  { href: "/", labelKey: "nav.home", icon: Home },
+type NavigationItem = { href: string; labelKey: TranslationKey; icon: typeof Home };
+
+/** What the user does every day: plan the week, set goals, keep notes, ask about the history. */
+const PRIMARY_NAVIGATION_ITEMS = [
+  { href: "/", labelKey: "nav.week", icon: CalendarCheck },
+  { href: "/objectives", labelKey: "nav.goals", icon: Target },
+  { href: "/knowledge", labelKey: "nav.knowledge", icon: BookOpen },
+  { href: "/insights", labelKey: "nav.insights", icon: Sparkles }
+] satisfies NavigationItem[];
+
+/** Detailed tools kept available but out of the way. */
+const SECONDARY_NAVIGATION_ITEMS = [
+  { href: "/daily-log", labelKey: "nav.dailyLog", icon: SlidersHorizontal },
+  { href: "/todo", labelKey: "nav.todoAdvanced", icon: CheckSquare },
+  { href: "/objectives/planning", labelKey: "nav.objectivesPlanning", icon: FolderKanban },
+  { href: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
+  { href: "/habits", labelKey: "nav.habits", icon: Repeat2 },
+  { href: "/time-allocation", labelKey: "nav.timeAllocation", icon: PieChart },
+  { href: "/emotional", labelKey: "nav.emotional", icon: HeartPulse },
+  { href: "/thinking", labelKey: "nav.thinking", icon: Lightbulb },
   { href: "/life-terminal", labelKey: "nav.terminal", icon: MonitorCog },
   { href: "/life", labelKey: "nav.life", icon: Activity },
-  { href: "/daily-log", labelKey: "nav.dailyLog", icon: SlidersHorizontal },
-  { href: "/emotional", labelKey: "nav.emotional", icon: HeartPulse },
-  { href: "/todo", labelKey: "nav.todo", icon: CheckSquare },
-  { href: "/thinking", labelKey: "nav.thinking", icon: Lightbulb },
-  { href: "/objectives", labelKey: "nav.objectives", icon: FolderKanban },
   { href: "/performance", labelKey: "nav.performance", icon: TrendingUp },
-  { href: "/time-allocation", labelKey: "nav.timeAllocation", icon: PieChart },
-  { href: "/habits", labelKey: "nav.habits", icon: Repeat2 },
-  { href: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
-  { href: "/history", labelKey: "nav.history", icon: Clock3 },
-  { href: "/settings", labelKey: "nav.settings", icon: Settings }
-] satisfies Array<{ href: string; labelKey: TranslationKey; icon: typeof Home }>;
+  { href: "/history", labelKey: "nav.history", icon: Clock3 }
+] satisfies NavigationItem[];
+
+const SETTINGS_NAVIGATION_ITEM: NavigationItem = { href: "/settings", labelKey: "nav.settings", icon: Settings };
+const NAVIGATION_ITEMS: NavigationItem[] = [...PRIMARY_NAVIGATION_ITEMS, ...SECONDARY_NAVIGATION_ITEMS, SETTINGS_NAVIGATION_ITEM];
 
 const SIDEBAR_STORAGE_KEY = "life-regime:sidebar-collapsed";
 
@@ -78,6 +95,48 @@ function NavLink({
       <Icon className="h-5 w-5 shrink-0" />
       {!collapsed ? <span className="truncate">{label}</span> : null}
     </Link>
+  );
+}
+
+function SecondaryNavigation({
+  collapsed,
+  pathname,
+  onNavigate
+}: {
+  collapsed: boolean;
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const { translate } = useLocale();
+  const isCurrentPageSecondary = SECONDARY_NAVIGATION_ITEMS.some((item) => item.href === pathname);
+  const [isExpanded, setIsExpanded] = useState(isCurrentPageSecondary);
+
+  return (
+    <div className="grid gap-2">
+      <button
+        type="button"
+        onClick={() => setIsExpanded((current) => !current)}
+        aria-expanded={isExpanded}
+        title={translate("nav.moreTools")}
+        className={`focus-ring flex h-9 items-center rounded-2xl px-3 text-xs font-medium uppercase tracking-wide text-muted transition hover:text-ink ${collapsed ? "justify-center" : "justify-between"}`}
+      >
+        {!collapsed ? <span>{translate("nav.moreTools")}</span> : null}
+        <ChevronDown className={`h-4 w-4 transition ${isExpanded ? "rotate-180" : ""}`} />
+      </button>
+      {isExpanded
+        ? SECONDARY_NAVIGATION_ITEMS.map((item) => (
+            <NavLink
+              key={item.href}
+              href={item.href}
+              label={translate(item.labelKey)}
+              icon={item.icon}
+              collapsed={collapsed}
+              active={pathname === item.href}
+              onNavigate={onNavigate}
+            />
+          ))
+        : null}
+    </div>
   );
 }
 
@@ -126,7 +185,7 @@ function SidebarContent({
       </div>
 
       <nav className="thin-scrollbar mt-8 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">
-        {NAVIGATION_ITEMS.map((item) => (
+        {PRIMARY_NAVIGATION_ITEMS.map((item) => (
           <NavLink
             key={item.href}
             href={item.href}
@@ -137,6 +196,15 @@ function SidebarContent({
             onNavigate={onNavigate}
           />
         ))}
+        <SecondaryNavigation collapsed={collapsed && !mobile} pathname={pathname} onNavigate={onNavigate} />
+        <NavLink
+          href={SETTINGS_NAVIGATION_ITEM.href}
+          label={translate(SETTINGS_NAVIGATION_ITEM.labelKey)}
+          icon={SETTINGS_NAVIGATION_ITEM.icon}
+          collapsed={collapsed && !mobile}
+          active={pathname === SETTINGS_NAVIGATION_ITEM.href}
+          onNavigate={onNavigate}
+        />
       </nav>
 
       <div className="mt-auto grid gap-2">
@@ -217,7 +285,7 @@ export function AppShell({ children, wide = false }: { children: React.ReactNode
             <Menu className="h-5 w-5" />
           </button>
           <p className="truncate text-sm font-medium text-muted">
-            {translate(NAVIGATION_ITEMS.find((item) => item.href === pathname)?.labelKey ?? "nav.home")}
+            {translate(NAVIGATION_ITEMS.find((item) => item.href === pathname)?.labelKey ?? "nav.week")}
           </p>
         </div>
         <div className="min-w-0">{children}</div>

@@ -8,6 +8,8 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 
+from pydantic.alias_generators import to_camel
+
 from ..knowledge.french_dates import WEEKDAYS
 from ..knowledge.projected_notes import TaskSnapshot
 from ..knowledge.text_tokens import tokenize
@@ -66,7 +68,8 @@ class HistoryPatterns:
     idle_objectives: list[str]
 
     def to_json(self) -> dict:
-        return asdict(self)
+        patterns_json = _camelize_keys(asdict(self))
+        return patterns_json
 
 
 def detect_history_patterns(history: PeriodHistory) -> HistoryPatterns:
@@ -195,3 +198,11 @@ def _idle_objectives(history: PeriodHistory) -> list[str]:
 def _top_items(items: list[RecurringItem]) -> list[RecurringItem]:
     top_items = sorted(items, key=lambda item: (-item.count, item.label))[:MAX_PATTERN_ITEMS]
     return top_items
+
+
+def _camelize_keys(node: object) -> object:
+    if isinstance(node, dict):
+        return {to_camel(key): _camelize_keys(child) for key, child in node.items()}
+    if isinstance(node, list):
+        return [_camelize_keys(child) for child in node]
+    return node

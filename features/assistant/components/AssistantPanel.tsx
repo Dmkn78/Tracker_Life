@@ -9,8 +9,8 @@ import { useLocale } from "@/features/interface/localization/LocaleProvider";
 import { createTodoTasks } from "@/features/todo/api/todoApi";
 import { ApiError } from "@/lib/http/apiClient";
 import { previewAssistant } from "../api/assistantApi";
-import { ASSISTANT_PREFERENCES_EVENT, DEFAULT_ASSISTANT_PROVIDER, readAssistantProvider } from "../application/assistantPreferences";
-import { parseAssistantTask, resolveAssistantInstruction, type AssistantInstruction, type AssistantMode, type AssistantPreview, type AssistantProvider, type AssistantTask } from "../domain/assistant";
+import { useDefaultAiProvider } from "@/features/ai-providers/application/useDefaultAiProvider";
+import { parseAssistantTask, resolveAssistantInstruction, type AssistantInstruction, type AssistantMode, type AssistantPreview, type AssistantTask } from "../domain/assistant";
 import { AssistantTaskEditor, type AssistantTaskSelection } from "./AssistantTaskEditor";
 import { ASSISTANT_COPY } from "./assistantCopy";
 
@@ -26,7 +26,8 @@ type PreviewState = { preview: AssistantPreview; tasks: AssistantTaskSelection[]
 export function AssistantPanel({ date, initialMode = "tasks", onTasksCreated, beforePreview, disabled = false }: AssistantPanelProps): React.ReactElement {
   const { locale } = useLocale();
   const copy = ASSISTANT_COPY[locale];
-  const [provider, setProvider] = useState<AssistantProvider>(DEFAULT_ASSISTANT_PROVIDER);
+  const providerState = useDefaultAiProvider();
+  const isProviderReady = providerState.kind === "ready";
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState<AssistantMode>(initialMode);
   const [previewState, setPreviewState] = useState<PreviewState | null>(null);
@@ -48,25 +49,10 @@ export function AssistantPanel({ date, initialMode = "tasks", onTasksCreated, be
 
   useEffect(() => {
     mountedRef.current = true;
-    const restoreProvider = () => {
-      setProvider(readAssistantProvider());
-      generationRef.current += 1;
-      requestRef.current?.abort();
-      requestRef.current = null;
-      setIsLoading(false);
-    };
-    restoreProvider();
-    const restoreStoredProvider = (event: StorageEvent) => {
-      if (event.key === null || event.key.startsWith("life-regime:assistant:") || event.key === "life-regime:server") restoreProvider();
-    };
-    window.addEventListener(ASSISTANT_PREFERENCES_EVENT, restoreProvider);
-    window.addEventListener("storage", restoreStoredProvider);
     return () => {
       mountedRef.current = false;
       generationRef.current += 1;
       requestRef.current?.abort();
-      window.removeEventListener(ASSISTANT_PREFERENCES_EVENT, restoreProvider);
-      window.removeEventListener("storage", restoreStoredProvider);
     };
   }, []);
 
@@ -91,7 +77,7 @@ export function AssistantPanel({ date, initialMode = "tasks", onTasksCreated, be
 
   async function preparePreview(): Promise<void> {
     if (requestRef.current || savingRef.current || recorderBusyRef.current || disabled) return;
-    if (!provider.model.trim()) { setError(copy.configure); return; }
+    if (!isProviderReady) { setError(copy.configure); return; }
     let instruction: AssistantInstruction;
     try { instruction = resolveAssistantInstruction(prompt, mode, date); }
     catch { setError(copy.validation); return; }
@@ -106,7 +92,7 @@ export function AssistantPanel({ date, initialMode = "tasks", onTasksCreated, be
     try {
       await beforePreview?.();
       if (controller.signal.aborted || generation !== generationRef.current) return;
-      const preview = await previewAssistant(provider, instruction, controller.signal);
+      const preview = await previewAssistant(instruction, controller.signal);
       if (controller.signal.aborted || generation !== generationRef.current) return;
       setPreviewState({ preview, status: "ready", tasks: preview.tasks.map((task, index) => ({ ...task, key: `${generation}:${index}`, selected: true })) });
     } catch (cause: unknown) {
@@ -168,8 +154,8 @@ export function AssistantPanel({ date, initialMode = "tasks", onTasksCreated, be
       <p className="text-xs leading-5 text-muted">{copy.commands}</p>
       <SummaryRecorder key={date} locale={locale} disabled={isBusy} onBusyChange={reportRecorderBusy} onTranscript={(transcript) => setPrompt((current) => appendSummaryTranscript(current, transcript))} />
       <p className="text-xs text-muted">{copy.voice}</p>
-      {!provider.model ? <p className="text-sm text-warn">{copy.configure}</p> : <p className="break-words text-xs text-muted">LM Studio · {provider.model}</p>}
-      <div className="flex flex-wrap gap-2"><PrimaryButton type="button" disabled={areActionsDisabled || !provider.model} onClick={() => void preparePreview()}>{isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}{isLoading ? copy.loading : copy.preview}</PrimaryButton>{isLoading ? <SecondaryButton type="button" onClick={cancelPreview}>{copy.cancel}</SecondaryButton> : null}</div>
+      {providerState.kind === "ready" ? <p className="break-words text-xs text-muted">{providerState.provider.label} · {providerState.provider.model}</p> : providerState.kind === "loading" ? null : <p className="text-sm text-warn">{copy.configure}</p>}
+      <div className="flex flex-wrap gap-2"><PrimaryButton type="button" disabled={areActionsDisabled || !isProviderReady} onClick={() => void preparePreview()}>{isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}{isLoading ? copy.loading : copy.preview}</PrimaryButton>{isLoading ? <SecondaryButton type="button" onClick={cancelPreview}>{copy.cancel}</SecondaryButton> : null}</div>
       {previewState ? <div className="space-y-4 border-t border-line pt-4">
         <p className="text-xs text-muted">{previewState.preview.from} → {previewState.preview.to}</p>
         {previewState.preview.analysis ? <div><h3 className="font-semibold text-ink">{copy.analysis}</h3><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-ink">{previewState.preview.analysis}</p></div> : null}

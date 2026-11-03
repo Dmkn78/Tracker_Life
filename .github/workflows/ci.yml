@@ -79,6 +79,7 @@ jobs:
           pnpm test:habits
           pnpm test:daily-log
           pnpm test:assistant
+          pnpm test:week
           pnpm test:emotional
           pnpm test:calendar
           pnpm test:time-allocation

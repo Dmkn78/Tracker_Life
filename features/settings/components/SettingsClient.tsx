@@ -9,7 +9,7 @@ import { updateTrackingSettings } from "@/features/settings/api/settingsApi";
 import type { TrackingSettingsPatch } from "@/features/settings/domain/settings";
 import { ApiError } from "@/lib/http/apiClient";
 import { LogoutButton } from "./LogoutButton";
-import { AssistantSettingsPanel } from "@/features/assistant/components/AssistantSettingsPanel";
+import { AiProvidersPanel } from "@/features/ai-providers/components/AiProvidersPanel";
 
 type SaveState = "saved" | "saving" | "failed";
 
@@ -128,7 +128,7 @@ export function SettingsClient({
 
       {interfaceSettings === "included" ? <InterfaceSettingsPanel /> : null}
 
-      <AssistantSettingsPanel />
+      <AiProvidersPanel />
 
       <Panel>
         <h2 className="text-lg font-semibold text-ink">{translate("settings.session")}</h2>
