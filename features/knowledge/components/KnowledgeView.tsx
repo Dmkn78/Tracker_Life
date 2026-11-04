@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Pill, PrimaryButton, SecondaryButton, SegmentedButton } from "@/components/ui";
 import { useLocale } from "@/features/interface/localization/LocaleProvider";
+import { CAPTURE_SAVED_EVENT } from "@/features/quick-capture/domain/quickCapture";
 import { captureNote, fetchVaultStatus, searchNotes, syncVault } from "../api/knowledgeApi";
 import { NOTE_TYPE_FILTERS, toSearchTypes, type NoteTypeFilter, type SearchResult, type SyncReport, type VaultStatus } from "../domain/knowledge";
 import { KNOWLEDGE_COPY, type KnowledgeCopy } from "./knowledgeCopy";
@@ -31,6 +32,11 @@ export function KnowledgeView(): React.ReactElement {
   }, [query, typeFilter, refreshKey]);
 
   const refreshResults = useCallback(() => setRefreshKey((current) => current + 1), []);
+
+  useEffect(() => {
+    window.addEventListener(CAPTURE_SAVED_EVENT, refreshResults);
+    return () => window.removeEventListener(CAPTURE_SAVED_EVENT, refreshResults);
+  }, [refreshResults]);
 
   return (
     <div className="grid gap-5">

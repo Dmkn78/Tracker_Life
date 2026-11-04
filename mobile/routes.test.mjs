@@ -6,6 +6,8 @@ test("every mobile section has a route, including the website dashboard aliases"
   for (const page of MOBILE_PAGES) assert.equal(parseMobileRoute(`#${mobileRouteHref(page)}`).page, page);
   assert.equal(parseMobileRoute("/dashboard/life-terminal").page, "life-terminal");
   assert.equal(parseMobileRoute("/dashboard").page, "life-terminal");
+  assert.equal(parseMobileRoute("/objectives/planning").page, "objectives-planning");
+  assert.deepEqual(parseMobileRoute("/knowledge?note=Cours%2FA.md"), { page: "knowledge", search: "?note=Cours%2FA.md" });
 });
 
 test("history, log dates and period selections survive hash navigation", () => {

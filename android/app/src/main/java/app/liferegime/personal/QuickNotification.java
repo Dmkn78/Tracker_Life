@@ -30,7 +30,9 @@ public final class QuickNotification {
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Ajout rapide de tâches", NotificationManager.IMPORTANCE_LOW));
-        PendingIntent add = taskIntent(context, NOTIFICATION_ID, "liferegime://todo/new");
+        // The bottom input strip opens over the current screen, without launching the app.
+        PendingIntent add = PendingIntent.getActivity(context, NOTIFICATION_ID, QuickCaptureActivity.intentFor(context, QuickCaptureStore.TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         PendingIntent open = taskIntent(context, NOTIFICATION_ID + 1, "liferegime://todo");
         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
         boolean known = today.equals(preferences.getString("summaryDate", "")) && preferences.getString("scope", "").equals(preferences.getString("summaryScope", ""));

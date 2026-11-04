@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CAPTURE_SAVED_EVENT } from "@/features/quick-capture/domain/quickCapture";
 import { createTodoTasks, deleteTodoTask, updateTodoTask } from "@/features/todo/api/todoApi";
 import { fetchWeekBoard, saveRecap, type RecapTarget } from "../api/weekApi";
 import {
@@ -46,9 +47,13 @@ export function useWeekBoard(): { state: WeekBoardState; actionError: string; ac
     loadRequest.current = controller;
     try {
       const board = await fetchWeekBoard(requestedWeekId, controller.signal);
-      if (!controller.signal.aborted) setState({ kind: "ready", board });
+      if (!controller.signal.aborted) { setState({ kind: "ready", board }); setActionError(""); }
     } catch (error: unknown) {
-      if (!controller.signal.aborted) setState({ kind: "failed", message: error instanceof Error ? error.message : "" });
+      if (controller.signal.aborted) return;
+      const message = error instanceof Error ? error.message : "";
+      // A board already on screen stays usable offline; only the very first load shows the failure screen.
+      setState((current) => (current.kind === "ready" ? current : { kind: "failed", message }));
+      setActionError(message);
     }
   }, []);
 
@@ -57,13 +62,25 @@ export function useWeekBoard(): { state: WeekBoardState; actionError: string; ac
     return () => loadRequest.current?.abort();
   }, [reload, weekId]);
 
+  useEffect(() => {
+    const reloadAfterCapture = () => { void reload(weekId); };
+    window.addEventListener(CAPTURE_SAVED_EVENT, reloadAfterCapture);
+    window.addEventListener("online", reloadAfterCapture);
+    return () => {
+      window.removeEventListener(CAPTURE_SAVED_EVENT, reloadAfterCapture);
+      window.removeEventListener("online", reloadAfterCapture);
+    };
+  }, [reload, weekId]);
+
   const runOptimistic = useCallback(async (applyLocally: (board: WeekBoard) => WeekBoard, persist: () => Promise<unknown>): Promise<void> => {
     setActionError("");
     setState((current) => (current.kind === "ready" ? { kind: "ready", board: applyLocally(current.board) } : current));
     try {
       await persist();
     } catch (error: unknown) {
+      await reload(weekId);
       setActionError(error instanceof Error ? error.message : "");
+      return;
     }
     await reload(weekId);
   }, [reload, weekId]);

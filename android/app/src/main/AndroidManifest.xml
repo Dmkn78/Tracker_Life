@@ -38,9 +38,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
-    <activity android:name=".QuickCaptureActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Material.Light.Dialog.Alert" android:windowSoftInputMode="adjustResize|stateAlwaysVisible" />
+    <activity android:name=".QuickCaptureActivity" android:exported="false" android:excludeFromRecents="true" android:taskAffinity="" android:launchMode="singleTask" android:theme="@android:style/Theme.Material.Dialog.NoActionBar" android:windowSoftInputMode="adjustResize|stateAlwaysVisible" />
         <receiver android:name=".QuickCaptureBootReceiver" android:enabled="true" android:exported="false">
             <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>
+        </receiver>
+    <receiver android:name=".QuickCaptureWidget" android:exported="false" android:label="@string/widget_label">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/quick_capture_widget_info" />
         </receiver>
     </application>
 

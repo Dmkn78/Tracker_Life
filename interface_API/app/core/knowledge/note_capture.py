@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from .markdown_note import extract_hashtags, render_frontmatter
-from .note_paths import inbox_note_path
+from .markdown_note import extract_hashtags, parse_note, render_frontmatter
+from .note_paths import INBOX_FOLDER, inbox_note_path
+from .vault_store import VaultStore
 
 CAPTURE_TITLE_LENGTH = 70
 
@@ -18,7 +19,7 @@ class CapturedNote:
     title: str
 
 
-def build_captured_note(raw_text: str, captured_at: datetime) -> CapturedNote:
+def build_captured_note(raw_text: str, captured_at: datetime, capture_id: str | None = None) -> CapturedNote:
     """The first line becomes the title; hashtags become YAML tags. Nothing else is asked."""
     text = raw_text.strip()
     first_line = text.split("\n", 1)[0].lstrip("# ").strip()
@@ -30,6 +31,8 @@ def build_captured_note(raw_text: str, captured_at: datetime) -> CapturedNote:
         "tags": ["inbox", *extract_hashtags(text)],
         "source": "tracker-capture",
     }
+    if capture_id:
+        frontmatter["capture_id"] = capture_id
     body = _build_capture_body(text, title)
     timestamp_key = captured_at.strftime("%Y-%m-%d %H%M")
     captured_note = CapturedNote(inbox_note_path(timestamp_key, title), render_frontmatter(frontmatter) + "\n" + body, title)
@@ -42,3 +45,13 @@ def _build_capture_body(text: str, title: str) -> str:
     is_title_only = "\n" not in text and title == text
     body = f"# {title}\n" if is_title_only else f"# {title}\n\n{text}\n"
     return body
+
+
+def find_captured_note_path(store: VaultStore, capture_id: str) -> str | None:
+    """A retried capture is recognised by the id stored in its frontmatter (Inbox only)."""
+    for vault_file in store.list_markdown_files():
+        if not vault_file.relative_path.startswith(f"{INBOX_FOLDER}/"):
+            continue
+        if parse_note(store.read_text(vault_file.relative_path) or "").frontmatter.get("capture_id") == capture_id:
+            return vault_file.relative_path
+    return None

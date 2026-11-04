@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { AppThemeProvider } from "@/features/interface/components/AppThemeProvider";
 import { AppearanceProvider } from "@/features/interface/components/AppearanceProvider";
 import { LocaleProvider } from "@/features/interface/localization/LocaleProvider";
@@ -7,7 +7,15 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Life Regime Tracker",
-  description: "Low-friction daily tracking, tasks, calendar context, and weekly JSON exports."
+  description: "Low-friction daily tracking, tasks, calendar context, and weekly JSON exports.",
+  appleWebApp: { capable: true, title: "Life Regime" }
+};
+
+// "resizes-content" keeps the quick-capture sheet above the phone keyboard instead of behind it.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content"
 };
 
 export default function RootLayout({

@@ -1,5 +1,8 @@
 import { useCallback } from "react";
-import { HomeContent } from "@/features/home/components/HomeContent";
+import { WeekBoardView } from "@/features/week/components/WeekBoardView";
+import { GoalsView } from "@/features/goals/components/GoalsView";
+import { KnowledgeView } from "@/features/knowledge/components/KnowledgeView";
+import { InsightsView } from "@/features/insights/components/InsightsView";
 import { LifeDashboardContent } from "@/features/life-terminal/components/LifeDashboardContent";
 import { LifeTerminalClient } from "@/features/life-terminal/components/LifeTerminalClient";
 import { parseLifeTerminalData } from "@/features/life-terminal/api/lifeTerminalApi";
@@ -40,7 +43,10 @@ export default function MobileFeaturePages({ route, serverScope }: { route: Mobi
     case "time-allocation": return <MobileAllocation search={route.search} date={date} />;
     case "history": return <MobileHistory search={route.search} />;
     case "settings": return <MobileResource load={loadSettings}>{settings => <div className="space-y-4"><WeeklyExportButton /><SettingsClient initialCalorieTarget={settings.calorieTarget} initialSleepDelay={settings.defaultSleepDelayMin} usingDevAccessKey={false} interfaceSettings="external" /></div>}</MobileResource>;
-    case "home": return <MobileResource load={loadTerminal}>{data => <HomeContent data={data} />}</MobileResource>;
+    case "home": return <WeekBoardView />;
+    case "objectives": return <GoalsView />;
+    case "knowledge": return <KnowledgeView />;
+    case "insights": return <InsightsView />;
     case "life": return <MobileResource load={loadTerminal}>{data => <LifeDashboardContent data={data} />}</MobileResource>;
     case "life-terminal": return <MobileResource load={loadTerminal}>{data => <LifeTerminalClient data={data} />}</MobileResource>;
     default: return null;

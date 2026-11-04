@@ -204,7 +204,7 @@ La décomposition d'objectif utilise le même principe : propositions seulement,
 | P0 | Coffre Obsidian : projection, capture, recherche hybride, lecture | Fait |
 | P0 | Analyse : constats calculés + réponses sourcées | Fait |
 | P0 | Navigation à 4 entrées + « Plus d'outils » | Fait |
-| P1 | Appliquer les 4 écrans à l'application Android (`mobile/`) | À faire |
+| P1 | Appliquer les 4 écrans à l'application téléphone (`mobile/`) + saisie rapide et widget | Fait (§8) |
 | P1 | Importer les notes « Réflexion » dans `Inbox/` puis retirer l'écran Réflexion (aujourd'hui elles sont projetées en lecture dans `Tracker/Idées/`) | À faire |
 | P1 | Raison facultative lors du « pas faite » sur la Semaine (alimente les blocages récurrents) | À faire |
 | P1 | Suggestion IA de tags/domaine pour les notes de l'Inbox, en proposition à valider | À faire |
@@ -253,7 +253,7 @@ Un faux serveur de modèles local parlait les protocoles OpenAI-compatible et Ol
 - **Appels réels** à OpenAI, Anthropic, Gemini et OpenRouter : l'environnement de test n'avait ni clés ni accès réseau sortant direct. Les formats de requête et de réponse sont couverts par des tests unitaires ; les messages d'erreur (hôte introuvable, inaccessible) ont été vérifiés.
 - **LM Studio et Ollama réels** : remplacés par un serveur simulé. La compatibilité du `json_schema` dépend du modèle chargé.
 - **Ouverture du coffre dans l'application Obsidian** : les fichiers sont du Markdown standard avec YAML ; le rendu dans Obsidian n'a pas été observé.
-- **Application Android** : non refondue, non testée sur appareil.
+- **Application Android** : voir §8.
 
 ---
 
@@ -277,4 +277,24 @@ Nouvelle migration à appliquer : `prisma/migrations/20261103120000_ai_providers
 - Le coffre est commun au serveur : l'application étant mono-utilisateur, c'est voulu ; en multi-utilisateur il faudrait un coffre par utilisateur.
 - Une modification faite dans Obsidian **à l'intérieur** d'un bloc géré est remplacée à la synchronisation suivante (c'est la contrepartie de la règle « base = source de vérité » ; écrire hors du bloc).
 - Les tâches supprimées dans l'application ne suppriment pas les anciennes notes de journal (aucun fichier n'est jamais effacé) ; le bloc géré est simplement régénéré sans elles.
-- L'application Android garde l'ancienne navigation.
+
+---
+
+## 8. Saisie rapide sur téléphone et widget Android (ajout du 4 novembre)
+
+Objectif : noter une tâche ou une note en quelques secondes, sans ouvrir l'application et sans réseau.
+
+| Point d'entrée | Ce qui s'ouvre |
+|---|---|
+| Bouton flottant « + » (site et app téléphone, tous les écrans) | Bandeau en bas d'écran : choix **Tâche / Note**, un seul champ déjà actif, **Aujourd'hui / Demain / Plus tard** pour une tâche, dictée Parakeet facultative. Entrée ajoute la tâche et laisse le bandeau ouvert pour la suivante. Pour une note, Entrée passe à la ligne et Ctrl + Entrée enregistre. |
+| Appui long sur l'icône de l'app web installée | Raccourcis « Nouvelle tâche » (`/?capture=task`) et « Nouvelle note » (`/knowledge?capture=note`), déclarés dans `app/manifest.ts`. |
+| Widget Android « Ajout rapide » (APK) | Une barre « Qu'as-tu à faire ? » et un bouton crayon pour une note. Un appui ouvre un bandeau natif par-dessus l'écran courant (`QuickCaptureActivity`), sans lancer l'application. |
+| Bouton « + » de la notification permanente | Le même bandeau natif. |
+
+**Fiabilité hors ligne** : l'app téléphone envoie chaque ajout aux points d'accès idempotents (`/api/tasks/capture`, avec une date possible, et `/api/knowledge/notes` avec `requestId`). Si le réseau manque, l'ajout est conservé sur le téléphone avec le même identifiant et renvoyé plus tard ; le serveur ne crée jamais de doublon. Le widget écrit dans la même file (`QuickCaptureStore`, schéma v2 avec type et date) puis tente un envoi immédiat avec la session de l'app (`QuickCaptureSync`). En cas d'échec, l'envoi se fait à la prochaine ouverture.
+
+**L'app téléphone** affiche désormais les mêmes écrans que le site : Semaine, Objectifs, Notes, Analyser, et « Plus » pour les outils détaillés (liste des tâches, planning, planification des objectifs, journal, etc.).
+
+**Vérifié** (Playwright, Pixel 7 émulé, site et app mobile servie à `/mobile-app/`) : ouverture du bandeau avec le champ actif, ajouts successifs sans fermer le bandeau ni perdre le clavier, tâche pour demain, note enregistrée dans `Inbox/`, rafraîchissement automatique de la semaine, raccourci d'URL, manifeste, ajout hors ligne mis en file puis synchronisé au retour du réseau (sans doublon, la semaine se recharge seule). Le code Java du widget, du bandeau, de la file et de l'envoi compile contre l'API Android 34.
+
+**Non vérifié** : l'APK n'a pas été construit ni installé ici, faute de SDK Android complet. Le rendu du widget sur un écran d'accueil, l'affichage du clavier par-dessus le bandeau natif et l'envoi immédiat avec le cookie de session restent à tester sur ton téléphone ; la CI compile l'APK. L'installation de l'app web et ses raccourcis dépendent du navigateur (Chrome Android les propose).

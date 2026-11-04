@@ -203,6 +203,16 @@ class KnowledgeApiTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/knowledge/note", params={"path": "../x.md"}).status_code, 400)
         self.assertEqual(self.client.get("/api/knowledge/status").json()["managedCount"], 4)
 
+    def test_retried_phone_note_is_created_once(self) -> None:
+        body = {"text": "Note dictée hors ligne", "requestId": "3f2b6c1e-8f4a-4d7e-9a51-0c2d6e7f8a90"}
+
+        first = self.client.post("/api/knowledge/notes", json=body).json()
+        second = self.client.post("/api/knowledge/notes", json=body).json()
+
+        self.assertEqual(first["path"], second["path"])
+        self.assertEqual(first["captureId"], body["requestId"])
+        self.assertEqual(len(list(Path(self.directory.name, "Inbox").glob("*.md"))), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

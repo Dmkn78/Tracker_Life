@@ -43,6 +43,12 @@ class TaskCaptureApiTests(unittest.TestCase):
         self.assertEqual(tasks[0].status, "PLANNED")
         self.assertEqual(self.client.get("/api/performance").json()["daily"]["capitalCents"], 0)
 
+    def test_capture_can_target_a_day(self):
+        response = self.client.post("/api/tasks/capture", json={**self.payload, "date": "2026-11-05"})
+        self.assertEqual(response.status_code, 200, response.text)
+        task = self.db.scalar(select(Task).where(Task.userId == self.user.id))
+        self.assertEqual(task.date.isoformat(), "2026-11-05")
+
     def test_retry_preserves_edits_and_does_not_resurrect_deleted_task(self):
         first = self.client.post("/api/tasks/capture", json=self.payload).json()
         task_id = first["taskId"]

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..contracts.knowledge import NoteCaptureRequest
 from ..core.knowledge.markdown_note import parse_note
-from ..core.knowledge.note_capture import build_captured_note
+from ..core.knowledge.note_capture import build_captured_note, find_captured_note_path
 from ..core.knowledge.note_paths import TRACKER_FOLDER
 from ..core.knowledge.search_index import SearchQuery, search_notes
 from ..core.knowledge.tracker_snapshot import load_tracker_snapshot
@@ -65,10 +65,14 @@ def search_vault(
 
 @router.post("/notes")
 def capture_note(body: NoteCaptureRequest, user: User = Depends(get_current_user), store: VaultStore = Depends(get_vault_store)) -> dict:
-    captured_note = build_captured_note(body.text, datetime.now())
+    capture_id = str(body.request_id) if body.request_id else None
+    existing_path = find_captured_note_path(store, capture_id) if capture_id else None
+    if existing_path is not None:
+        return {"path": existing_path, "title": existing_path.rsplit("/", 1)[-1].removesuffix(".md"), "captureId": capture_id}
+    captured_note = build_captured_note(body.text, datetime.now(), capture_id)
     store.ensure_exists()
     created_path = store.create_new(captured_note.relative_path, captured_note.text)
-    return {"path": created_path, "title": captured_note.title}
+    return {"path": created_path, "title": captured_note.title, "captureId": capture_id}
 
 
 @router.get("/note")

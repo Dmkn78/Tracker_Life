@@ -1,11 +1,14 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
-import { requestJson, expectJsonObject, expectString } from "@/lib/http/apiClient";
+import { ApiError, requestJson, expectJsonObject, expectString } from "@/lib/http/apiClient";
+import { isCaptureTextValid, type CaptureKind, type CaptureOutcome, type CaptureRequest } from "@/features/quick-capture/domain/quickCapture";
 
-export type PendingCapture = { id: string; title: string; createdAt: number; scope: string };
+/** Captures saved by the widget or offline wait here; the server deduplicates them by id. */
+export type PendingCapture = { id: string; kind: CaptureKind; title: string; date: string | null; createdAt: number; scope: string };
+type CaptureFields = Pick<PendingCapture, "id" | "kind" | "title" | "date">;
 type CapturePlugin = {
   configure(options: { scope: string }): Promise<void>;
   list(options: { scope: string }): Promise<{ captures: PendingCapture[] }>;
-  capture(options: { title: string }): Promise<void>;
+  capture(options: CaptureFields): Promise<void>;
   acknowledge(options: { id: string; scope: string }): Promise<void>;
   enableNotification(): Promise<{ enabled: boolean }>;
   disableNotification(): Promise<void>;
@@ -30,14 +33,43 @@ export async function listCaptures(): Promise<PendingCapture[]> {
   return readBrowserCaptures().filter((capture) => capture.scope === currentScope);
 }
 
-export async function captureTask(title: string): Promise<void> {
-  const trimmed = title.trim();
-  if (!trimmed || trimmed.length > 500) throw new Error("Le titre doit contenir entre 1 et 500 caractères.");
+/**
+ * Phone capture: send now through the idempotent endpoints; if the network fails,
+ * keep the capture (same id) on the phone so a later retry cannot create a duplicate.
+ */
+export async function submitOrQueueCapture(capture: CaptureRequest): Promise<CaptureOutcome> {
+  if (!isCaptureTextValid(capture.kind, capture.text)) throw new Error("Le texte est vide ou trop long.");
+  const fields: CaptureFields = { id: crypto.randomUUID(), kind: capture.kind, title: capture.text, date: capture.date };
+  try {
+    await sendCapture(fields);
+    return "saved";
+  } catch (error: unknown) {
+    if (isDefiniteRejection(error)) throw error;
+    await queueCapture(fields);
+    return "queued";
+  }
+}
+
+async function queueCapture(fields: CaptureFields): Promise<void> {
   if (!currentScope) throw new Error("Connecte d’abord ton serveur.");
-  if (Capacitor.isNativePlatform()) return native.capture({ title: trimmed });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...readBrowserCaptures(), {
-    id: crypto.randomUUID(), title: trimmed, createdAt: Date.now(), scope: currentScope
-  }]));
+  if (Capacitor.isNativePlatform()) return native.capture(fields);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...readBrowserCaptures(), { ...fields, createdAt: Date.now(), scope: currentScope }]));
+}
+
+/** 4xx answers (except timeout/throttling) mean the server refused it: retrying would not help. */
+function isDefiniteRejection(error: unknown): boolean {
+  const isRejected = error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429;
+  return isRejected;
+}
+
+async function sendCapture(capture: CaptureFields): Promise<void> {
+  const acknowledge = (payload: unknown) => {
+    if (expectString(expectJsonObject(payload).captureId, "captureId") !== capture.id) throw new Error("Capture acknowledgement mismatch");
+  };
+  const request = capture.kind === "note"
+    ? { url: "/api/knowledge/notes", body: { requestId: capture.id, text: capture.title } }
+    : { url: "/api/tasks/capture", body: { requestId: capture.id, title: capture.title, date: capture.date } };
+  await requestJson(request.url, acknowledge, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.body) });
 }
 
 export function syncCaptures(): Promise<number> {
@@ -56,10 +88,7 @@ async function sendPendingCaptures(): Promise<number> {
   let sent = 0;
   for (const capture of captures) {
     if (currentScope !== scope) break;
-    await requestJson("/api/tasks/capture", (payload) => {
-      const receipt = expectJsonObject(payload);
-      if (expectString(receipt.captureId, "captureId") !== capture.id) throw new Error("Capture acknowledgement mismatch");
-    }, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId: capture.id, title: capture.title }) });
+    await sendCapture(capture);
     if (Capacitor.isNativePlatform()) await native.acknowledge({ id: capture.id, scope });
     else localStorage.setItem(STORAGE_KEY, JSON.stringify(readBrowserCaptures().filter((entry) => entry.id !== capture.id)));
     sent++;
@@ -90,7 +119,12 @@ function readBrowserCaptures(): PendingCapture[] {
   return entries.map((entry: unknown) => {
     const record = expectJsonObject(entry);
     if (typeof record.createdAt !== "number") throw new Error("Invalid capture date");
-    return { id: expectString(record.id, "id"), title: expectString(record.title, "title"), scope: expectString(record.scope, "scope"), createdAt: record.createdAt };
+    return {
+      id: expectString(record.id, "id"), title: expectString(record.title, "title"), scope: expectString(record.scope, "scope"), createdAt: record.createdAt,
+      // Captures stored before notes existed are undated tasks.
+      kind: record.kind === "note" ? "note" : "task",
+      date: typeof record.date === "string" ? record.date : null
+    };
   });
 }
 

@@ -1,4 +1,4 @@
-export const MOBILE_PAGES = ["home", "todo", "funnel", "daily-log", "objectives", "performance", "life-terminal", "life", "emotional", "habits", "thinking", "time-allocation", "calendar", "history", "settings", "more"] as const;
+export const MOBILE_PAGES = ["home", "knowledge", "insights", "todo", "funnel", "daily-log", "objectives", "objectives-planning", "performance", "life-terminal", "life", "emotional", "habits", "thinking", "time-allocation", "calendar", "history", "settings", "more"] as const;
 export type MobilePage = typeof MOBILE_PAGES[number];
 export type MobileRoute = { page: MobilePage; search: string };
 
@@ -7,12 +7,13 @@ export function parseMobileRoute(href: string): MobileRoute | null {
   if (!path.startsWith("/") || path.startsWith("//")) return null;
   const url = new URL(path, "https://mobile.invalid");
   const slug = url.pathname.replace(/^\/|\/$/g, "");
-  const page = slug === "" ? "home" : slug === "dashboard" || slug === "dashboard/life-terminal" ? "life-terminal" : slug;
+  const page = slug === "" ? "home" : slug === "dashboard" || slug === "dashboard/life-terminal" ? "life-terminal" : slug.replaceAll("/", "-");
   return MOBILE_PAGES.includes(page as MobilePage) ? { page: page as MobilePage, search: url.search } : null;
 }
 
 export function mobileRouteHref(page: MobilePage): string {
-  return page === "home" ? "/" : `/${page}`;
+  if (page === "home") return "/";
+  return page === "objectives-planning" ? "/objectives/planning" : `/${page}`;
 }
 
 export function selectedMobileDate(search: string, today: string): string {

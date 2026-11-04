@@ -25,11 +25,22 @@ manifest = manifest.replace('android:allowBackup="true"', 'android:allowBackup="
 manifest = manifest.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/life_regime_mark"');
 manifest = manifest.replace('android:roundIcon="@mipmap/ic_launcher_round"', 'android:roundIcon="@drawable/life_regime_mark"');
 if (!manifest.includes("android:usesCleartextTraffic=")) manifest = manifest.replace("<application", '<application android:usesCleartextTraffic="true"');
+// Bottom input strip opened by the widget and the notification, in its own task so it never brings the app forward.
+const QUICK_CAPTURE_ACTIVITY = '<activity android:name=".QuickCaptureActivity" android:exported="false" android:excludeFromRecents="true" android:taskAffinity="" android:launchMode="singleTask" android:theme="@android:style/Theme.Material.Dialog.NoActionBar" android:windowSoftInputMode="adjustResize|stateAlwaysVisible" />';
+const QUICK_CAPTURE_WIDGET = `<receiver android:name=".QuickCaptureWidget" android:exported="false" android:label="@string/widget_label">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/quick_capture_widget_info" />
+        </receiver>`;
+manifest = manifest.replace(/<activity android:name="\.QuickCaptureActivity"[^>]*\/>/, QUICK_CAPTURE_ACTIVITY);
 if (!manifest.includes(".QuickCaptureActivity")) {
-  manifest = manifest.replace("</application>", `<activity android:name=".QuickCaptureActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Material.Light.Dialog.Alert" android:windowSoftInputMode="adjustResize|stateAlwaysVisible" />
+  manifest = manifest.replace("</application>", `${QUICK_CAPTURE_ACTIVITY}
         <receiver android:name=".QuickCaptureBootReceiver" android:enabled="true" android:exported="false">
             <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>
         </receiver>
+    </application>`);
+}
+if (!manifest.includes(".QuickCaptureWidget")) {
+  manifest = manifest.replace("</application>", `${QUICK_CAPTURE_WIDGET}
     </application>`);
 }
 await writeFile(manifestPath, manifest);

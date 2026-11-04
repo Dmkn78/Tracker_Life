@@ -1,7 +1,9 @@
 import type { MobilePage } from "./routes";
 
 const sections: { page: MobilePage; title: string; description: string }[] = [
-  { page: "home", title: "Accueil", description: "Synthèse de la journée" },
+  { page: "todo", title: "Liste des tâches", description: "Tous les champs : durée, importance, tags, entreprise" },
+  { page: "funnel", title: "Planning détaillé", description: "Entonnoir, semaine et mois" },
+  { page: "objectives-planning", title: "Planification des objectifs", description: "Horizons, jalons et prévisions" },
   { page: "life-terminal", title: "Life Terminal", description: "Indicateurs, contexte et exécution" },
   { page: "life", title: "Trajectoire", description: "État, risques et évolution" },
   { page: "daily-log", title: "Logs quotidiens", description: "Sommeil, énergie, travail et bilan" },

@@ -30,6 +30,7 @@ import {
 import { useEffect, useState } from "react";
 import { AppearanceControl } from "@/features/interface/components/AppearanceControl";
 import { LocaleControl } from "@/features/interface/components/LocaleControl";
+import { QuickCaptureLauncher } from "@/features/quick-capture/components/QuickCaptureLauncher";
 import { useLocale } from "@/features/interface/localization/LocaleProvider";
 import type { TranslationKey } from "@/features/interface/localization/messages";
 
@@ -288,8 +289,9 @@ export function AppShell({ children, wide = false }: { children: React.ReactNode
             {translate(NAVIGATION_ITEMS.find((item) => item.href === pathname)?.labelKey ?? "nav.week")}
           </p>
         </div>
-        <div className="min-w-0">{children}</div>
+        <div className="min-w-0 pb-20">{children}</div>
       </main>
+      <QuickCaptureLauncher />
     </div>
   );
 }
