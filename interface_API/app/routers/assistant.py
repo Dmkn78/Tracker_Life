@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..config import get_settings
 from ..contracts.assistant import (
     AssistantMode,
     AssistantPreviewRequest,
@@ -17,6 +16,7 @@ from ..contracts.assistant import (
 from ..core.ai.errors import AiProviderError
 from ..core.ai_provider_store import resolve_active_connection
 from ..core.assistant_preview import generate_preview
+from ..ai_runtime import current_provider_runtime
 from ..database import get_db
 from ..models import DailyLog, Task, User
 from ..security import get_current_user
@@ -25,6 +25,7 @@ from ..security import get_current_user
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 MAX_CONTEXT_TASKS = 100
 MAX_CONTEXT_TEXT_CHARACTERS = 24000
+LOCAL_CONTEXT_TEXT_CHARACTERS = 10000
 MAX_CONTEXT_FIELD_CHARACTERS = 1500
 LOG_NUMBER_FIELDS = (
     "energy", "productivity", "startFriction", "mentalFatigue", "physicalFatigue", "focusQuality",
@@ -43,9 +44,10 @@ async def preview_assistant(
 ) -> AssistantPreviewResponse:
     try:
         # Resolve the provider before reading private journal data.
-        connection = resolve_active_connection(db, user.id, get_settings().provider_key_secret, body.provider_id)
+        connection = resolve_active_connection(db, user.id, current_provider_runtime(), body.provider_id)
         start, end = analysis_period(body.date, body.mode)
-        context = build_analysis_context(user.id, body.date, body.mode, db) if body.mode != "tasks" else {}
+        text_budget = LOCAL_CONTEXT_TEXT_CHARACTERS if connection.is_local else MAX_CONTEXT_TEXT_CHARACTERS
+        context = build_analysis_context(user.id, body.date, body.mode, db, text_budget) if body.mode != "tasks" else {}
         proposal = await generate_preview(connection, body.prompt, body.date, body.mode, context)
         return AssistantPreviewResponse(analysis=proposal.analysis, tasks=proposal.tasks, from_date=start.isoformat(), to=end.isoformat())
     except AiProviderError as error:
@@ -61,7 +63,7 @@ def analysis_period(date_key: str, mode: AssistantMode) -> tuple[Date, Date]:
     return start, end
 
 
-def build_analysis_context(user_id: str, date_key: str, mode: AssistantMode, db: Session) -> dict:
+def build_analysis_context(user_id: str, date_key: str, mode: AssistantMode, db: Session, text_budget: int = MAX_CONTEXT_TEXT_CHARACTERS) -> dict:
     """Only read the current user's persisted logs/tasks in the selected inclusive period."""
     start, end = analysis_period(date_key, mode)
     logs = list(db.scalars(select(DailyLog).where(
@@ -73,7 +75,6 @@ def build_analysis_context(user_id: str, date_key: str, mode: AssistantMode, db:
     logs_by_date = {log.date: log for log in logs}
     tasks_truncated = len(tasks) > MAX_CONTEXT_TASKS
     tasks = tasks[:MAX_CONTEXT_TASKS]
-    text_budget = MAX_CONTEXT_TEXT_CHARACTERS
     text_truncated = False
 
     def bounded_text(text: str | None, maximum: int = MAX_CONTEXT_FIELD_CHARACTERS) -> str | None:

@@ -34,7 +34,7 @@ async def generate_json(connection: ProviderConnection, prompt: StructuredPrompt
         }],
         "tool_choice": {"type": "tool", "name": prompt.schema_name},
     }
-    response = await request_provider_json(ProviderHttpRequest(f"{connection.base_url}/v1/messages", _headers(connection), payload))
+    response = await request_provider_json(ProviderHttpRequest(f"{connection.base_url}/v1/messages", _headers(connection), payload, connection.generation_timeout_seconds))
     generated_object = _read_tool_input(response, prompt.schema_name)
     return generated_object
 

@@ -151,6 +151,19 @@ class InsightsApiTests(unittest.TestCase):
         self.assertEqual([fact["text"] for fact in body["answer"]["unverified"]], ["Fabriqué"])
         self.assertEqual(sorted(source["id"] for source in body["sources"]), ["S1", "S2"])
 
+    def test_local_models_receive_a_smaller_context(self) -> None:
+        today = date.today()
+        for offset in range(20):
+            self.db.add(DailyLog(userId=self.user.id, date=today - timedelta(days=offset + 1), status="DRAFT", textSummary="x" * 1400))
+        self.db.flush()
+        request = self.mock_model({"summary": "s", "facts": [], "hypotheses": [], "recommendations": []})
+
+        local_response = self.client.post("/api/insights/ask", json={"question": "Synthèse"})
+        local_size = len(request.await_args.args[0].payload["messages"][1]["content"])
+
+        self.assertTrue(local_response.json()["isTruncated"])
+        self.assertLess(local_size, 16_000)
+
     def test_decompose_returns_proposals_without_creating_tasks(self) -> None:
         self.mock_model({"steps": [{"title": "Relire le cours sur les martingales", "detail": None}]})
 

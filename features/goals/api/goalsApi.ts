@@ -1,9 +1,9 @@
 import { expectBoolean, expectJsonObject, expectNullableString, expectNumber, expectString, parseJsonArray, requestJson } from "@/lib/http/apiClient";
+import { AI_REQUEST_TIMEOUT_MS } from "@/lib/aiRequestTimeout";
 import { createTodoTasks } from "@/features/todo/api/todoApi";
 import { DEFAULT_GOAL_HORIZON, type Goal, type GoalTask, type ProposedStep } from "../domain/goal";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
-const DECOMPOSITION_TIMEOUT_MS = 190_000;
 
 export function fetchGoals(signal?: AbortSignal): Promise<Goal[]> {
   return requestJson("/api/goals", (payload) => parseJsonArray(expectJsonObject(payload, "goals").goals, "goals", parseGoal), { signal });
@@ -38,7 +38,7 @@ export async function addGoalSteps(goalId: string, steps: ProposedStep[]): Promi
 
 export function proposeGoalSteps(goalId: string, signal?: AbortSignal): Promise<ProposedStep[]> {
   return requestJson("/api/insights/decompose", parseProposedSteps, {
-    method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ objectiveId: goalId }), signal, timeoutMs: DECOMPOSITION_TIMEOUT_MS
+    method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ objectiveId: goalId }), signal, timeoutMs: AI_REQUEST_TIMEOUT_MS
   });
 }
 

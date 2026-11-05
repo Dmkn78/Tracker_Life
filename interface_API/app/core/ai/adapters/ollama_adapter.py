@@ -27,7 +27,7 @@ async def generate_json(connection: ProviderConnection, prompt: StructuredPrompt
         "stream": False,
         "options": {"temperature": prompt.temperature, "num_predict": prompt.max_tokens},
     }
-    response = await request_provider_json(ProviderHttpRequest(f"{connection.base_url}/api/chat", _headers(connection), payload))
+    response = await request_provider_json(ProviderHttpRequest(f"{connection.base_url}/api/chat", _headers(connection), payload, connection.generation_timeout_seconds))
     message = response.get("message")
     if not isinstance(message, dict) or response.get("done") is False:
         raise AiProviderError(502, INVALID_MODEL_OUTPUT_MESSAGE)

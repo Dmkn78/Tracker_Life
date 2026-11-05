@@ -262,6 +262,7 @@ Un faux serveur de modèles local parlait les protocoles OpenAI-compatible et Ol
 | Variable | Rôle | Défaut |
 |---|---|---|
 | `KNOWLEDGE_VAULT_DIR` | Dossier du coffre. Pointe-le vers ton coffre Obsidian existant. | `data/vault` à la racine du dépôt |
+| `AI_GENERATION_TIMEOUT_SECONDS` | Durée maximale d'une génération par le modèle. Les modèles locaux peuvent mettre plusieurs minutes à lire un long prompt. Rester sous 660 s (attente du proxy web, du navigateur et de l'app). | `600` |
 | `AI_KEYS_SECRET` | Secret de chiffrement des clés API. Le changer rend les clés enregistrées illisibles (il faut les ressaisir). | `AUTH_SECRET` |
 
 Si l'API tourne sur un VPS, le coffre est sur le VPS : synchronise-le avec ton PC par Syncthing, Obsidian Sync ou Git. Pour un modèle local sur ton PC, utilise son adresse LAN ou Tailscale dans « Modèles d'IA ».
@@ -298,3 +299,10 @@ Objectif : noter une tâche ou une note en quelques secondes, sans ouvrir l'appl
 **Vérifié** (Playwright, Pixel 7 émulé, site et app mobile servie à `/mobile-app/`) : ouverture du bandeau avec le champ actif, ajouts successifs sans fermer le bandeau ni perdre le clavier, tâche pour demain, note enregistrée dans `Inbox/`, rafraîchissement automatique de la semaine, raccourci d'URL, manifeste, ajout hors ligne mis en file puis synchronisé au retour du réseau (sans doublon, la semaine se recharge seule). Le code Java du widget, du bandeau, de la file et de l'envoi compile contre l'API Android 34.
 
 **Non vérifié** : l'APK n'a pas été construit ni installé ici, faute de SDK Android complet. Le rendu du widget sur un écran d'accueil, l'affichage du clavier par-dessus le bandeau natif et l'envoi immédiat avec le cookie de session restent à tester sur ton téléphone ; la CI compile l'APK. L'installation de l'app web et ses raccourcis dépendent du navigateur (Chrome Android les propose).
+
+### Délais de réponse des modèles (ajout du 5 novembre)
+
+- L'API attend jusqu'à `AI_GENERATION_TIMEOUT_SECONDS` (600 s par défaut, auparavant 120 s). Le proxy Next, le navigateur et l'app Android attendent 660 s pour recevoir le message d'erreur de l'API plutôt qu'une coupure muette. La configuration nginx du README passe à `proxy_read_timeout 700s` : **à reporter sur un VPS déjà déployé**.
+- Un serveur injoignable (connexion impossible en 5 s) n'est plus présenté comme un modèle lent : le message indique l'adresse et les causes probables (écoute réseau de LM Studio/Ollama, pare-feu).
+- Pour un fournisseur local, l'analyse envoie au plus 12 000 caractères de sources (30 000 en cloud) et l'assistant 10 000 (24 000 en cloud), pour limiter le temps de lecture du prompt.
+- L'app Android coupait toutes les requêtes non listées à 15 s, y compris les analyses et la décomposition d'objectifs ; les délais par chemin sont maintenant dans `mobile/nativeReadTimeout.ts`.

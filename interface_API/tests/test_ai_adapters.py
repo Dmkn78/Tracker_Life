@@ -45,6 +45,7 @@ class AdapterProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.url, "https://api.openai.com/v1/chat/completions")
         self.assertEqual(request.headers["Authorization"], "Bearer secret-key")
         self.assertEqual(request.payload["response_format"]["type"], "json_schema")
+        self.assertEqual(request.timeout_seconds, 600)
 
     async def test_anthropic_forces_a_single_tool_call(self) -> None:
         response = {"content": [{"type": "text", "text": "ignored"}, {"type": "tool_use", "name": "answer", "input": ANSWER}]}
@@ -199,6 +200,33 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
                 await self.send(handler)
             self.assertEqual(raised.exception.status_code, expected_status)
             self.assertNotIn("PRIVATE_KEY", raised.exception.message)
+
+    async def test_unreachable_server_is_not_reported_as_a_slow_model(self) -> None:
+        def unreachable(request):
+            raise httpx.ConnectTimeout("timed out", request=request)
+
+        with self.assertRaises(AiProviderError) as raised:
+            await self.send(unreachable, "http://192.168.1.20:1234/v1/models")
+
+        self.assertEqual(raised.exception.status_code, 503)
+        self.assertIn("Impossible de joindre 192.168.1.20", raised.exception.message)
+        self.assertNotIn("trop de temps", raised.exception.message)
+
+    async def test_slow_generation_reports_the_configured_delay(self) -> None:
+        client_class = httpx.AsyncClient
+
+        def slow(request):
+            raise httpx.ReadTimeout("slow", request=request)
+
+        transport = httpx.MockTransport(slow)
+        request = http_transport.ProviderHttpRequest("http://127.0.0.1:1234/v1/chat/completions", {}, {"model": "m"}, 900)
+        with patch.object(http_transport.httpx, "AsyncClient", side_effect=lambda **options: client_class(transport=transport, **options)) as factory:
+            with self.assertRaises(AiProviderError) as raised:
+                await http_transport.request_provider_json(request)
+
+        self.assertEqual(raised.exception.status_code, 504)
+        self.assertIn("900 s", raised.exception.message)
+        self.assertEqual(factory.call_args.kwargs["timeout"].read, 900)
 
     async def test_hostnames_resolving_to_link_local_are_refused(self) -> None:
         with patch.object(http_transport, "ensure_resolved_host_allowed", side_effect=AiProviderError(400, "refused")):

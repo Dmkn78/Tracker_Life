@@ -2,8 +2,11 @@ import { Capacitor, CapacitorHttp } from "@capacitor/core";
 import { configureApiTransport } from "@/lib/http/apiClient";
 import { normalizeServerAddress, type ServerTransportPolicy } from "./serverAddress";
 import { serializeNativeRequestBody } from "./nativeRequestBody";
+import { AI_REQUEST_TIMEOUT_MS } from "@/lib/aiRequestTimeout";
+import { buildNativeReadTimeout } from "./nativeReadTimeout";
 
 export const TASKS_UPDATED_EVENT = "life-regime:tasks-updated";
+const nativeReadTimeoutMs = buildNativeReadTimeout(AI_REQUEST_TIMEOUT_MS);
 
 export function connectApi(server: string, policy: ServerTransportPolicy = "https-or-local"): void {
   const origin = normalizeServerAddress(server, policy);
@@ -19,7 +22,7 @@ export function connectApi(server: string, policy: ServerTransportPolicy = "http
     const request = CapacitorHttp.request({
       url, method: options.method ?? "GET", headers,
       data: body.data, dataType: body.dataType,
-      responseType: "text", connectTimeout: 15000, readTimeout: body.dataType === "formData" || path === "/api/transcription-jobs" ? 610000 : path === "/api/transcribe" || path === "/api/assistant/preview" ? 190000 : path === "/api/mobile-update" ? 45000 : path === "/api/assistant/models" ? 30000 : 15000,
+      responseType: "text", connectTimeout: 15000, readTimeout: nativeReadTimeoutMs(path, body.dataType === "formData"),
       disableRedirects: true
     });
     // Native HTTP has bounded timeouts but cannot be cancelled at the socket level.

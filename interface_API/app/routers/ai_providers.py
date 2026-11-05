@@ -21,6 +21,7 @@ from ..core.ai_provider_store import (
     make_default_provider,
     serialize_provider,
 )
+from ..ai_runtime import current_provider_runtime
 from ..database import get_db
 from ..models import AiProvider, User
 from ..security import get_current_user
@@ -108,17 +109,16 @@ async def test_provider(body: AiProviderTestRequest, user: User = Depends(get_cu
 
 
 def _build_test_connection(body: AiProviderTestRequest, user_id: str, db: Session) -> ProviderConnection:
-    key_secret = get_settings().provider_key_secret
     if body.provider_id:
-        stored = build_provider_connection(load_owned_provider(db, user_id, body.provider_id), key_secret)
+        stored = build_provider_connection(load_owned_provider(db, user_id, body.provider_id), current_provider_runtime())
         base_url = normalize_provider_base_url(body.base_url) if body.base_url else stored.base_url
         api_key = body.api_key if body.api_key else stored.api_key
-        connection = ProviderConnection(stored.protocol, base_url, stored.model, api_key)
+        connection = ProviderConnection(stored.protocol, base_url, stored.model, api_key, stored.is_local)
         return connection
     preset = get_provider_preset(body.kind or "")
     base_url = normalize_provider_base_url(body.base_url or preset.default_base_url)
     _require_api_key_when_needed(preset.requires_api_key, body.api_key)
-    connection = ProviderConnection(preset.protocol, base_url, "", body.api_key or None)
+    connection = ProviderConnection(preset.protocol, base_url, "", body.api_key or None, preset.is_local)
     return connection
 
 

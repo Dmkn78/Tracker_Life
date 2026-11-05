@@ -13,6 +13,7 @@ from .analysis_period import PeriodHistory
 from .history_patterns import HistoryPatterns
 
 MAX_EVIDENCE_CHARACTERS = 30_000
+LOCAL_EVIDENCE_CHARACTERS = 12_000
 MAX_EVIDENCE_TEXT = 1_500
 STATUS_WORDS = {"DONE": "fait", "NOT_DONE": "non fait", "CANCELLED": "annulé", "POSTPONED": "reporté", "IN_PROGRESS": "en cours"}
 
@@ -39,7 +40,12 @@ class EvidenceCatalog:
         return {item.id: item for item in self.items}
 
 
-def build_evidence_catalog(history: PeriodHistory, patterns: HistoryPatterns, note_hits: list[SearchHit]) -> EvidenceCatalog:
+def build_evidence_catalog(
+    history: PeriodHistory,
+    patterns: HistoryPatterns,
+    note_hits: list[SearchHit],
+    max_characters: int = MAX_EVIDENCE_CHARACTERS,
+) -> EvidenceCatalog:
     """Most recent records are kept first when the budget is reached; the model is told about it."""
     candidates = [
         _statistics_evidence(patterns),
@@ -50,7 +56,7 @@ def build_evidence_catalog(history: PeriodHistory, patterns: HistoryPatterns, no
     kept_items: list[Evidence] = []
     used_characters = 0
     for candidate in candidates:
-        if used_characters + len(candidate.text) > MAX_EVIDENCE_CHARACTERS:
+        if used_characters + len(candidate.text) > max_characters:
             continue
         used_characters += len(candidate.text)
         kept_items.append(candidate)

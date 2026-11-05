@@ -1,7 +1,7 @@
 import { expectBoolean, expectJsonObject, expectNullableString, expectNumber, expectString, expectStringArray, parseJsonArray, requestJson } from "@/lib/http/apiClient";
+import { AI_REQUEST_TIMEOUT_MS } from "@/lib/aiRequestTimeout";
 import type { AnalysisPeriod, CitedStatement, EvidenceRecord, HistoryPatterns, InsightResult, InsightSource, RecurringItem } from "../domain/insights";
 
-const ANALYSIS_TIMEOUT_MS = 190_000;
 
 export function fetchPatterns(period: AnalysisPeriod, signal?: AbortSignal): Promise<HistoryPatterns> {
   const query = new URLSearchParams({ from: period.from, to: period.to });
@@ -14,7 +14,7 @@ export function askHistory(question: string, period: AnalysisPeriod, signal?: Ab
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question, from: period.from, to: period.to }),
     signal,
-    timeoutMs: ANALYSIS_TIMEOUT_MS
+    timeoutMs: AI_REQUEST_TIMEOUT_MS
   });
 }
 

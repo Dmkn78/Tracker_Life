@@ -39,7 +39,7 @@ async def generate_json(connection: ProviderConnection, prompt: StructuredPrompt
         },
     }
     url = f"{connection.base_url}/v1beta/models/{quote(connection.model, safe='')}:{GENERATE_METHOD}"
-    response = await request_provider_json(ProviderHttpRequest(url, _headers(connection), payload))
+    response = await request_provider_json(ProviderHttpRequest(url, _headers(connection), payload, connection.generation_timeout_seconds))
     generated_object = decode_model_json(_read_candidate_text(response))
     return generated_object
 

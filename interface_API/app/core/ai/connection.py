@@ -6,6 +6,9 @@ from dataclasses import dataclass, field
 
 from .provider_presets import ApiProtocol
 
+# Local models (CPU or modest GPU) can need minutes to read a long prompt.
+DEFAULT_GENERATION_TIMEOUT_SECONDS = 600
+
 
 @dataclass(frozen=True)
 class ProviderConnection:
@@ -13,6 +16,8 @@ class ProviderConnection:
     base_url: str
     model: str
     api_key: str | None = field(default=None, repr=False)
+    is_local: bool = False
+    generation_timeout_seconds: int = DEFAULT_GENERATION_TIMEOUT_SECONDS
 
 
 @dataclass(frozen=True)

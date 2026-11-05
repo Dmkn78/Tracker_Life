@@ -16,6 +16,7 @@ DEFAULT_FRONTEND_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
 DEFAULT_WHISPER_SERVICE_URL = "http://127.0.0.1:8001/transcribe"
 DEVELOPMENT_ACCESS_KEY = "dev-access-key"
 DEVELOPMENT_SIGNING_SECRET = "dev-only-life-regime-secret"
+DEFAULT_AI_GENERATION_TIMEOUT_SECONDS = 600
 DEFAULT_KNOWLEDGE_VAULT_DIR = BASE_DIR.parent / "data" / "vault"
 
 load_dotenv(BASE_DIR / ".env")
@@ -62,6 +63,7 @@ class Settings:
     whisper_timeout_seconds: int
     is_production: bool
     ai_keys_secret: str
+    ai_generation_timeout_seconds: int
     knowledge_vault_dir: Path
 
     @property
@@ -119,5 +121,6 @@ def get_settings() -> Settings:
         whisper_timeout_seconds=_read_positive_integer("WHISPER_TIMEOUT_SECONDS", 180),
         is_production=is_production,
         ai_keys_secret=os.environ.get("AI_KEYS_SECRET", ""),
+        ai_generation_timeout_seconds=_read_positive_integer("AI_GENERATION_TIMEOUT_SECONDS", DEFAULT_AI_GENERATION_TIMEOUT_SECONDS),
         knowledge_vault_dir=Path(os.environ.get("KNOWLEDGE_VAULT_DIR", str(DEFAULT_KNOWLEDGE_VAULT_DIR))).expanduser(),
     )

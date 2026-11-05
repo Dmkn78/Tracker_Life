@@ -10,7 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..config import get_settings
 from ..contracts.insights import GoalDecompositionRequest, InsightQuestionRequest
 from ..core.ai.connection import StructuredPrompt
 from ..core.ai.errors import AiProviderError
@@ -18,7 +17,7 @@ from ..core.ai.gateway import generate_validated
 from ..core.ai_provider_store import resolve_active_connection
 from ..core.insights.analysis_period import AnalysisPeriod, resolve_analysis_period, restrict_history
 from ..core.insights.cited_answer import InsightAnswer, apply_citation_policy
-from ..core.insights.evidence_catalog import build_evidence_catalog
+from ..core.insights.evidence_catalog import LOCAL_EVIDENCE_CHARACTERS, MAX_EVIDENCE_CHARACTERS, build_evidence_catalog
 from ..core.insights.goal_steps import GoalSteps
 from ..core.insights.history_patterns import detect_history_patterns
 from ..core.insights.insight_prompts import ANALYSIS_SYSTEM_PROMPT, DECOMPOSITION_SYSTEM_PROMPT
@@ -27,6 +26,7 @@ from ..core.knowledge.search_index import SearchHit, SearchQuery, search_notes
 from ..core.knowledge.tracker_snapshot import load_tracker_snapshot
 from ..core.knowledge.vault_index_cache import load_search_index
 from ..core.knowledge.vault_store import VaultStore
+from ..ai_runtime import current_provider_runtime
 from ..database import get_db
 from ..models import Objective, Task, User
 from .knowledge import get_vault_store
@@ -59,10 +59,13 @@ async def ask_history(
 ) -> dict:
     period = _resolve_period(body.date_from, body.date_to)
     try:
-        connection = resolve_active_connection(db, user.id, get_settings().provider_key_secret, body.provider_id)
+        connection = resolve_active_connection(db, user.id, current_provider_runtime(), body.provider_id)
         history = restrict_history(load_tracker_snapshot(db, user.id), period)
         patterns = detect_history_patterns(history)
-        catalog = build_evidence_catalog(history, patterns, _search_personal_notes(store, body.question, MAX_NOTE_EVIDENCE))
+        # A local model reads the prompt much more slowly: send it a smaller, most-recent-first selection.
+        evidence_budget = LOCAL_EVIDENCE_CHARACTERS if connection.is_local else MAX_EVIDENCE_CHARACTERS
+        note_hits = _search_personal_notes(store, body.question, MAX_NOTE_EVIDENCE)
+        catalog = build_evidence_catalog(history, patterns, note_hits, evidence_budget)
         user_message = json.dumps({
             "question": body.question, "periode": period.to_json(), "sourcesTronquees": catalog.is_truncated,
             "sources": [{"id": item.id, "type": item.kind, "date": item.date, "titre": item.title, "contenu": item.text} for item in catalog.items],
@@ -89,7 +92,7 @@ async def decompose_goal(
     """Return proposals only; nothing is created until the user accepts steps in the interface."""
     goal_title, goal_summary, existing_tasks = _load_goal_context(db, user.id, body)
     try:
-        connection = resolve_active_connection(db, user.id, get_settings().provider_key_secret, body.provider_id)
+        connection = resolve_active_connection(db, user.id, current_provider_runtime(), body.provider_id)
         related_notes = _search_personal_notes(store, f"{goal_title} {goal_summary or ''}", MAX_GOAL_CONTEXT_NOTES)
         user_message = json.dumps({
             "objectif": goal_title, "description": goal_summary, "tachesExistantes": existing_tasks,

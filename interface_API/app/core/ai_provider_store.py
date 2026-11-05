@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,6 +12,14 @@ from .ai.api_key_cipher import decrypt_api_key
 from .ai.connection import ProviderConnection
 from .ai.errors import AiProviderError
 from .ai.provider_presets import get_provider_preset
+
+@dataclass(frozen=True)
+class ProviderRuntime:
+    """Server-side settings applied to every provider call."""
+
+    key_secret: str
+    generation_timeout_seconds: int
+
 
 NO_PROVIDER_MESSAGE = "Aucun modèle d'IA n'est configuré. Ajoutez-en un dans Réglages → Modèles d'IA."
 
@@ -49,18 +59,21 @@ def make_default_provider(db: Session, user_id: str, provider: AiProvider) -> No
         other_provider.isDefault = other_provider.id == provider.id
 
 
-def build_provider_connection(provider: AiProvider, key_secret: str) -> ProviderConnection:
-    api_key = decrypt_api_key(key_secret, provider.encryptedApiKey) if provider.encryptedApiKey else None
+def build_provider_connection(provider: AiProvider, runtime: ProviderRuntime) -> ProviderConnection:
+    api_key = decrypt_api_key(runtime.key_secret, provider.encryptedApiKey) if provider.encryptedApiKey else None
+    preset = get_provider_preset(provider.kind)
     connection = ProviderConnection(
-        protocol=get_provider_preset(provider.kind).protocol,
+        protocol=preset.protocol,
         base_url=provider.baseUrl,
         model=provider.model,
         api_key=api_key,
+        is_local=preset.is_local,
+        generation_timeout_seconds=runtime.generation_timeout_seconds,
     )
     return connection
 
 
-def resolve_active_connection(db: Session, user_id: str, key_secret: str, provider_id: str | None = None) -> ProviderConnection:
+def resolve_active_connection(db: Session, user_id: str, runtime: ProviderRuntime, provider_id: str | None = None) -> ProviderConnection:
     """Use the requested provider, otherwise the default one, otherwise explain how to configure one."""
     if provider_id:
         provider = load_owned_provider(db, user_id, provider_id)
@@ -69,5 +82,5 @@ def resolve_active_connection(db: Session, user_id: str, key_secret: str, provid
         if not providers:
             raise AiProviderError(409, NO_PROVIDER_MESSAGE)
         provider = providers[0]
-    connection = build_provider_connection(provider, key_secret)
+    connection = build_provider_connection(provider, runtime)
     return connection

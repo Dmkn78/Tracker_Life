@@ -31,7 +31,7 @@ async def generate_json(connection: ProviderConnection, prompt: StructuredPrompt
         "max_tokens": prompt.max_tokens,
         "stream": False,
     }
-    response = await request_provider_json(ProviderHttpRequest(f"{connection.base_url}/chat/completions", _headers(connection), payload))
+    response = await request_provider_json(ProviderHttpRequest(f"{connection.base_url}/chat/completions", _headers(connection), payload, connection.generation_timeout_seconds))
     generated_object = decode_model_json(_read_message_content(response))
     return generated_object
 
