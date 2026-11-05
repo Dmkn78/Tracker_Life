@@ -29,7 +29,7 @@ export function TodoObjectiveTrajectory({ tasks, objectives, month }: { tasks: T
   return <Card>
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <h2 className="font-semibold">{fr ? "Trajectoire des objectifs liés" : "Linked objective trajectory"}</h2>
-      <a href="/objectives/planning" className="focus-ring text-xs text-accent">{fr ? "Ajuster les objectifs et les prévisions" : "Adjust objectives & forecasts"}</a>
+      <a href="/objectives/forecasts" className="focus-ring text-xs text-accent">{fr ? "Ajuster les objectifs et les prévisions" : "Adjust objectives & forecasts"}</a>
     </div>
     <p className="mb-4 text-xs text-muted">{fr ? "Avancement global des objectifs, incluant leurs autres tâches. Les prévisions nécessitent un historique réel." : "Overall objective progress, including their other tasks. Forecasts require recorded history."}</p>
     {error ? <p role="alert" className="text-sm text-risk">{error}</p> : !planning ? <p role="status" className="text-sm text-muted">{fr ? "Chargement…" : "Loading…"}</p> : null}

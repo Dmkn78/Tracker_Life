@@ -22,7 +22,7 @@ export type WeekBoardState =
 
 export type WeekBoardActions = {
   showWeek: (weekId: string) => void;
-  addTask: (title: string, destination: TaskDestination) => Promise<void>;
+  addTask: (title: string, destination: TaskDestination, objectiveId?: string | null) => Promise<void>;
   toggleTask: (task: BoardTask) => Promise<void>;
   markNotDone: (task: BoardTask) => Promise<void>;
   renameTask: (task: BoardTask, title: string) => Promise<void>;
@@ -87,7 +87,7 @@ export function useWeekBoard(): { state: WeekBoardState; actionError: string; ac
 
   const actions: WeekBoardActions = {
     showWeek: (nextWeekId) => { setState({ kind: "loading" }); setWeekId(nextWeekId); },
-    addTask: (title, destination) => runOptimistic((board) => board, () => createTodoTasks({ items: [{ title, date: destinationDate(destination) }] })),
+    addTask: (title, destination, objectiveId = null) => runOptimistic((board) => board, () => createTodoTasks({ items: [{ title, date: destinationDate(destination), objectiveId }] })),
     toggleTask: (task) => {
       const status = nextCheckboxStatus(task.status);
       return runOptimistic((board) => updateTaskOnBoard(board, task.id, { status }), () => updateTodoTask({ id: task.id, status }));

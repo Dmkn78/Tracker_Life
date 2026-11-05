@@ -39,6 +39,10 @@ export type InsightResult = { period: AnalysisPeriod; answer: InsightAnswer; sou
 export type PeriodPreset = 7 | 28 | 90;
 
 export const PERIOD_PRESETS: readonly PeriodPreset[] = [7, 28, 90];
+/** Same limit as the API (one year). */
+export const MAX_CUSTOM_PERIOD_DAYS = 366;
+
+export type CustomPeriodProblem = "missing" | "reversed" | "too-long";
 
 /** Inclusive range ending today: a 7-day preset covers today and the 6 previous days. */
 export function periodFromPreset(preset: PeriodPreset, todayKey: string): AnalysisPeriod {
@@ -47,6 +51,15 @@ export function periodFromPreset(preset: PeriodPreset, todayKey: string): Analys
   start.setUTCDate(end.getUTCDate() - (preset - 1));
   const period: AnalysisPeriod = { from: start.toISOString().slice(0, 10), to: todayKey };
   return period;
+}
+
+export function findCustomPeriodProblem(period: AnalysisPeriod): CustomPeriodProblem | null {
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  if (!datePattern.test(period.from) || !datePattern.test(period.to)) return "missing";
+  if (period.from > period.to) return "reversed";
+  const lengthInDays = (Date.parse(`${period.to}T00:00:00Z`) - Date.parse(`${period.from}T00:00:00Z`)) / 86_400_000 + 1;
+  const problem = lengthInDays > MAX_CUSTOM_PERIOD_DAYS ? "too-long" : null;
+  return problem;
 }
 
 export function hasAnyActivity(patterns: HistoryPatterns): boolean {

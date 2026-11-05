@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
-import { BookOpen, CalendarCheck, Target, Sparkles, Menu, Settings } from "lucide-react";
+import { BookOpen, CalendarCheck, CalendarRange, GraduationCap, Target, Menu, Settings } from "lucide-react";
 import { PrimaryButton, SecondaryButton, TextInput, FieldLabel } from "@/components/ui";
 import { InterfaceSettingsPanel } from "@/features/settings/components/InterfaceSettingsPanel";
 import { TodoClient } from "@/features/todo/components/TodoClient";
@@ -31,13 +31,14 @@ const SERVER_STORAGE_KEY = "life-regime:server";
 const HTTP_SERVER_STORAGE_KEY = "life-regime:http-server";
 const navigation = [
   { id: "home", title: "Semaine", icon: CalendarCheck },
+  { id: "objectives-planning", title: "Planifier", icon: CalendarRange },
   { id: "objectives", title: "Objectifs", icon: Target },
+  { id: "courses", title: "Cours", icon: GraduationCap },
   { id: "knowledge", title: "Notes", icon: BookOpen },
-  { id: "insights", title: "Analyser", icon: Sparkles },
   { id: "more", title: "Plus", icon: Menu }
 ] as const;
 /** Pages rendered directly here; every other page comes from the lazily loaded MobileFeaturePages. */
-const SHELL_PAGES: readonly MobilePage[] = ["todo", "funnel", "objectives-planning", "performance", "settings", "more"];
+const SHELL_PAGES: readonly MobilePage[] = ["todo", "funnel", "objectives-forecasts", "performance", "settings", "more"];
 
 function openQuickCapture(kind: CaptureKind): void {
   window.dispatchEvent(new CustomEvent(OPEN_CAPTURE_EVENT, { detail: kind }));
@@ -196,7 +197,7 @@ export function MobileApp() {
       {error ? <p role="alert" className="mb-3 text-sm text-risk">{error}</p> : null}
       {ready && page === "todo" ? <TodoClient key="todo" today={toDateKey()} refreshKey={revision} /> : null}
       {ready && page === "funnel" ? <TodoClient key="funnel" today={toDateKey()} refreshKey={revision} initialView="funnel" /> : null}
-      {ready && page === "objectives-planning" ? <MobileObjectives key={revision} /> : null}
+      {ready && page === "objectives-forecasts" ? <MobileObjectives key={revision} /> : null}
       {ready && page === "performance" ? <PerformanceClient key={revision} /> : null}
       {page === "more" ? <MobileMenu navigate={setPage} /> : null}
       {ready && !SHELL_PAGES.includes(page) ? <Suspense fallback={<p role="status">Chargement…</p>}><MobileFeaturePages key={`${server}:${page}`} route={route} serverScope={server} /></Suspense> : null}

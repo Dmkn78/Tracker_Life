@@ -12,7 +12,8 @@ from ..contracts.week import WEEK_ID_PATTERN, RecapWriteRequest
 from ..core.dates import get_iso_week_id, get_week_date_keys, parse_date_key, shift_week_id, to_date_key
 from ..core.week_board import is_open_status, summarize_task_statuses
 from ..database import get_db
-from ..models import DailyLog, Objective, Task, User, WeeklyRecap
+from ..core.courses.deadline_kinds import DEADLINE_KIND_LABELS
+from ..models import Course, CourseDeadline, DailyLog, Objective, Task, User, WeeklyRecap
 from ..security import get_current_user
 
 router = APIRouter(prefix="/api/week", tags=["week"])
@@ -34,6 +35,7 @@ def get_week(
     week_tasks = _load_tasks(db, user.id, and_(Task.date >= week_dates[0], Task.date <= week_dates[-1]))
     inbox_tasks = [row for row in _load_tasks(db, user.id, Task.date.is_(None)) if is_open_status(row[0].status)][:MAX_INBOX_TASKS]
     day_recaps = _load_day_recaps(db, user.id, week_dates)
+    day_deadlines = _load_day_deadlines(db, user.id, week_dates)
     weekly_recap = db.get(WeeklyRecap, (user.id, resolved_week_id))
     week_board = {
         "weekId": resolved_week_id,
@@ -45,6 +47,7 @@ def get_week(
                 "date": date_key,
                 "tasks": [_serialize_board_task(task, title) for task, title in week_tasks if task.date == day_date],
                 "recap": day_recaps.get(day_date),
+                "deadlines": day_deadlines.get(day_date, []),
             }
             for date_key, day_date in zip(date_keys, week_dates)
         ],
@@ -85,6 +88,23 @@ def _load_day_recaps(db: Session, user_id: str, week_dates: list[Date]) -> dict[
     ))
     recaps_by_date = {log.date: log.textSummary for log in logs if log.textSummary}
     return recaps_by_date
+
+
+def _load_day_deadlines(db: Session, user_id: str, week_dates: list[Date]) -> dict[Date, list[dict]]:
+    """Exams and submissions are shown on their day so the week is planned around them."""
+    rows = db.execute(
+        select(CourseDeadline, Course.name, Course.color)
+        .outerjoin(Course, and_(Course.id == CourseDeadline.courseId, Course.userId == user_id))
+        .where(CourseDeadline.userId == user_id, CourseDeadline.date >= week_dates[0], CourseDeadline.date <= week_dates[-1])
+        .order_by(CourseDeadline.time.asc().nulls_first())
+    ).all()
+    deadlines_by_date: dict[Date, list[dict]] = {}
+    for deadline, course_name, course_color in rows:
+        deadlines_by_date.setdefault(deadline.date, []).append({
+            "id": deadline.id, "title": deadline.title, "kind": deadline.kind, "kindLabel": DEADLINE_KIND_LABELS.get(deadline.kind, ""),
+            "time": deadline.time, "courseName": course_name, "courseColor": course_color,
+        })
+    return deadlines_by_date
 
 
 def _serialize_board_task(task: Task, objective_title: str | None) -> dict:

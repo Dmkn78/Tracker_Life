@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.database import get_db
 from app.main import app
-from app.models import DailyLog, Objective, Task, WeeklyRecap
+from app.models import DailyLog, Objective, Task, WeeklyRecap, Course, CourseDeadline
 from app.security import get_current_user
 from tests.sqlite_harness import create_sqlite_session
 
@@ -18,7 +18,7 @@ MONDAY = date(2026, 11, 2)
 
 class WeekApiTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.db = create_sqlite_session(Task, Objective, DailyLog, WeeklyRecap)
+        self.db = create_sqlite_session(Task, Objective, DailyLog, WeeklyRecap, Course, CourseDeadline)
         self.user = SimpleNamespace(id="week-user")
         app.dependency_overrides[get_current_user] = lambda: self.user
         app.dependency_overrides[get_db] = lambda: self.db

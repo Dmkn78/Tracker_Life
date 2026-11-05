@@ -11,7 +11,7 @@ export const GOALS_COPY = {
     addSelected: "Ajouter les étapes choisies ({count})", discard: "Ignorer", needsAi: "Configure un modèle d’IA dans Réglages pour obtenir des propositions.",
     markDone: "Atteint", reopen: "Rouvrir", archive: "Archiver", confirmArchive: "Archiver cet objectif ? Ses tâches sont conservées.",
     doneSection: "Objectifs atteints", rename: "Renommer", loading: "Chargement…", failed: "L’opération a échoué.",
-    advanced: "Planification détaillée (horizons, jalons, prévisions)"
+    advanced: "Planifier mes tâches sur la semaine"
   },
   en: {
     eyebrow: "Direction", title: "Goals",
@@ -25,7 +25,7 @@ export const GOALS_COPY = {
     addSelected: "Add selected steps ({count})", discard: "Dismiss", needsAi: "Configure an AI model in Settings to get suggestions.",
     markDone: "Achieved", reopen: "Reopen", archive: "Archive", confirmArchive: "Archive this goal? Its tasks are kept.",
     doneSection: "Achieved goals", rename: "Rename", loading: "Loading…", failed: "The operation failed.",
-    advanced: "Detailed planning (horizons, milestones, forecasts)"
+    advanced: "Plan my tasks across the week"
   }
 };
 

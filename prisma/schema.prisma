@@ -134,6 +134,8 @@ model User {
   emotionalReviews EmotionalReview[]
   aiProviders   AiProvider[]
   weeklyRecaps  WeeklyRecap[]
+  courses       Course[]
+  courseDeadlines CourseDeadline[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 }
@@ -653,4 +655,39 @@ model WeeklyRecap {
   updatedAt DateTime @updatedAt
 
   @@id([userId, weekId])
+}
+
+/// A course followed by the user (lecture, class, training).
+model Course {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  color     String           @default("#8da2fb")
+  archived  Boolean          @default(false)
+  deadlines CourseDeadline[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([userId, archived])
+}
+
+/// An exam, a submission or any important date. Local date and optional local time, like tasks.
+model CourseDeadline {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId        String?
+  course          Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title           String
+  kind            String   @default("other")
+  date            DateTime @db.Date
+  time            String?
+  durationMinutes Int      @default(60)
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([courseId])
 }

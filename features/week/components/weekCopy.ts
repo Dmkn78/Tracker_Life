@@ -10,7 +10,7 @@ export const WEEK_COPY = {
     saved: "Enregistré", toggle: "Marquer comme faite", reopen: "Rouvrir", notDone: "Pas faite", remove: "Supprimer",
     moveEarlier: "Jour précédent", moveLater: "Jour suivant", edit: "Modifier", loading: "Chargement de la semaine…",
     failed: "Impossible de charger la semaine.", retry: "Réessayer", confirmRemove: "Supprimer cette tâche ?", dragHint: "Glisse les tâches d’un jour à l’autre.",
-    linkedGoal: "Objectif"
+    linkedGoal: "Objectif", planAhead: "Planifier"
   },
   en: {
     eyebrow: "My week", previousWeek: "Previous week", nextWeek: "Next week", thisWeek: "This week",
@@ -23,7 +23,7 @@ export const WEEK_COPY = {
     saved: "Saved", toggle: "Mark as done", reopen: "Reopen", notDone: "Not done", remove: "Delete",
     moveEarlier: "Previous day", moveLater: "Next day", edit: "Edit", loading: "Loading the week…",
     failed: "The week could not be loaded.", retry: "Retry", confirmRemove: "Delete this task?", dragHint: "Drag tasks from one day to another.",
-    linkedGoal: "Goal"
+    linkedGoal: "Goal", planAhead: "Plan"
   }
 };
 

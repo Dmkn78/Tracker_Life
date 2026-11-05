@@ -5,9 +5,8 @@ import { Inbox } from "lucide-react";
 import type { BoardTask } from "../domain/weekBoard";
 import { BoardTaskItem, type BoardTaskHandlers } from "./BoardTaskItem";
 import { InlineTaskInput } from "./InlineTaskInput";
+import { INBOX_DROP_ID } from "./boardDragAndDrop";
 import type { WeekCopy } from "./weekCopy";
-
-export const INBOX_DROP_ID = "inbox";
 
 export function InboxColumn({ tasks, copy, handlers, onAdd }: {
   tasks: BoardTask[];

@@ -21,7 +21,7 @@ from app.core.knowledge.vault_store import VaultPathError, VaultStore
 from app.core.knowledge.vault_sync import sync_tracker_notes
 from app.database import get_db
 from app.main import app
-from app.models import DailyLog, Objective, Tag, Task, ThinkingNote, ThinkingNoteTag, WeeklyRecap
+from app.models import DailyLog, Objective, Tag, Task, ThinkingNote, ThinkingNoteTag, WeeklyRecap, Course, CourseDeadline
 from app.routers.knowledge import get_vault_store
 from app.security import get_current_user
 from tests.sqlite_harness import create_sqlite_session
@@ -168,7 +168,7 @@ class SearchTests(unittest.TestCase):
 class KnowledgeApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.directory = tempfile.TemporaryDirectory()
-        self.db = create_sqlite_session(Task, Objective, DailyLog, WeeklyRecap, ThinkingNote, ThinkingNoteTag, Tag)
+        self.db = create_sqlite_session(Task, Objective, DailyLog, WeeklyRecap, ThinkingNote, ThinkingNoteTag, Tag, Course, CourseDeadline)
         self.user = SimpleNamespace(id="kb-user")
         app.dependency_overrides[get_current_user] = lambda: self.user
         app.dependency_overrides[get_db] = lambda: self.db

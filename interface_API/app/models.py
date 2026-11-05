@@ -488,3 +488,31 @@ class WeeklyRecap(Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
     createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
     updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class Course(Base):
+    __tablename__ = "Course"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    userId: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    color: Mapped[str] = mapped_column(Text, nullable=False, default="#8da2fb")
+    archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class CourseDeadline(Base):
+    __tablename__ = "CourseDeadline"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    userId: Mapped[str] = mapped_column(String, nullable=False)
+    courseId: Mapped[str | None] = mapped_column(String)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False, default="other")
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    time: Mapped[str | None] = mapped_column(Text)
+    durationMinutes: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
+    note: Mapped[str | None] = mapped_column(Text)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)

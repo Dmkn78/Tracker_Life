@@ -1,4 +1,4 @@
-export const MOBILE_PAGES = ["home", "knowledge", "insights", "todo", "funnel", "daily-log", "objectives", "objectives-planning", "performance", "life-terminal", "life", "emotional", "habits", "thinking", "time-allocation", "calendar", "history", "settings", "more"] as const;
+export const MOBILE_PAGES = ["home", "knowledge", "insights", "todo", "funnel", "daily-log", "objectives", "objectives-planning", "objectives-forecasts", "courses", "performance", "life-terminal", "life", "emotional", "habits", "thinking", "time-allocation", "calendar", "history", "settings", "more"] as const;
 export type MobilePage = typeof MOBILE_PAGES[number];
 export type MobileRoute = { page: MobilePage; search: string };
 
@@ -13,7 +13,8 @@ export function parseMobileRoute(href: string): MobileRoute | null {
 
 export function mobileRouteHref(page: MobilePage): string {
   if (page === "home") return "/";
-  return page === "objectives-planning" ? "/objectives/planning" : `/${page}`;
+  if (page === "objectives-planning") return "/objectives/planning";
+  return page === "objectives-forecasts" ? "/objectives/forecasts" : `/${page}`;
 }
 
 export function selectedMobileDate(search: string, today: string): string {

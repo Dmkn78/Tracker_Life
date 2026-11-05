@@ -7,6 +7,8 @@ import {
   BookOpen,
   CalendarCheck,
   CalendarDays,
+  CalendarRange,
+  GraduationCap,
   CheckSquare,
   ChevronLeft,
   ChevronRight,
@@ -39,7 +41,9 @@ type NavigationItem = { href: string; labelKey: TranslationKey; icon: typeof Hom
 /** What the user does every day: plan the week, set goals, keep notes, ask about the history. */
 const PRIMARY_NAVIGATION_ITEMS = [
   { href: "/", labelKey: "nav.week", icon: CalendarCheck },
+  { href: "/objectives/planning", labelKey: "nav.planning", icon: CalendarRange },
   { href: "/objectives", labelKey: "nav.goals", icon: Target },
+  { href: "/courses", labelKey: "nav.courses", icon: GraduationCap },
   { href: "/knowledge", labelKey: "nav.knowledge", icon: BookOpen },
   { href: "/insights", labelKey: "nav.insights", icon: Sparkles }
 ] satisfies NavigationItem[];
@@ -48,7 +52,7 @@ const PRIMARY_NAVIGATION_ITEMS = [
 const SECONDARY_NAVIGATION_ITEMS = [
   { href: "/daily-log", labelKey: "nav.dailyLog", icon: SlidersHorizontal },
   { href: "/todo", labelKey: "nav.todoAdvanced", icon: CheckSquare },
-  { href: "/objectives/planning", labelKey: "nav.objectivesPlanning", icon: FolderKanban },
+  { href: "/objectives/forecasts", labelKey: "nav.objectivesPlanning", icon: FolderKanban },
   { href: "/calendar", labelKey: "nav.calendar", icon: CalendarDays },
   { href: "/habits", labelKey: "nav.habits", icon: Repeat2 },
   { href: "/time-allocation", labelKey: "nav.timeAllocation", icon: PieChart },

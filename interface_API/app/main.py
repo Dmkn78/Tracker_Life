@@ -15,6 +15,7 @@ from .routers import (
     auth,
     calendar_events,
     companies,
+    courses,
     daily_log,
     emotional_reviews,
     goals,
@@ -127,3 +128,4 @@ app.include_router(week.router)
 app.include_router(knowledge.router)
 app.include_router(insights.router)
 app.include_router(goals.router)
+app.include_router(courses.router)

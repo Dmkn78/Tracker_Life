@@ -5,7 +5,7 @@ import { defaultCaptureDate, moveTaskOnBoard, nextCheckboxStatus, shiftDestinati
 const task = (id, date, status = "planned") => ({ id, title: id, description: null, date, status, objectiveId: null, objectiveTitle: null });
 
 function board() {
-  const days = ["2026-11-02", "2026-11-03", "2026-11-04"].map((date) => ({ date, tasks: [], recap: null }));
+  const days = ["2026-11-02", "2026-11-03", "2026-11-04"].map((date) => ({ date, tasks: [], recap: null, deadlines: [] }));
   days[0].tasks = [task("a", "2026-11-02", "done"), task("b", "2026-11-02")];
   return { weekId: "2026-W45", previousWeekId: "2026-W44", nextWeekId: "2026-W46", today: "2026-11-03", days, inbox: [task("c", null)], recap: null, summary: summarizeDays(days) };
 }

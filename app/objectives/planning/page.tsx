@@ -1,16 +1,12 @@
 import { AppShell } from "@/components/AppShell";
-import { parseObjectivesData } from "@/features/objectives/api/objectivesApi";
+import { PlanningBoardView } from "@/features/planning/components/PlanningBoardView";
 import { requireUser } from "@/lib/auth";
-import { ObjectivesClient } from "@/features/objectives/components/ObjectivesClient";
-import { requestInternalApiJson } from "@/lib/server/internalApiClient";
 
-export default async function ObjectivesPage() {
+export default async function PlanningPage() {
   await requireUser();
-  const data = await requestInternalApiJson("/api/objectives", parseObjectivesData);
-
   return (
     <AppShell wide>
-      <ObjectivesClient initialData={data} />
+      <PlanningBoardView />
     </AppShell>
   );
 }

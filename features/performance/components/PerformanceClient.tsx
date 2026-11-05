@@ -101,7 +101,7 @@ export function PerformanceClient() {
             </div>
             <p className="mt-3 text-xs text-muted">Expected by end of today: {formatWorkTime(performance.expectedMinutes)}. Pace includes today and the remaining calendar days.</p>
             {performance.requiredDailyMinutes > 1440 ? <p className="mt-2 text-xs text-warn">The required pace exceeds 24h/day. Adjust the target to make the remaining plan feasible.</p> : null}
-            <div className="mt-5 flex flex-wrap gap-4 border-t border-line pt-4 text-sm"><Link className="text-accent" href="/objectives/planning">Plan or log a work block →</Link><Link className="text-accent" href="/todo">Complete priority tasks →</Link></div>
+            <div className="mt-5 flex flex-wrap gap-4 border-t border-line pt-4 text-sm"><Link className="text-accent" href="/objectives/forecasts">Plan or log a work block →</Link><Link className="text-accent" href="/todo">Complete priority tasks →</Link></div>
           </Card>
           <Card>
             <p className="text-xs uppercase tracking-widest text-muted">Performance status</p>

@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ...models import DailyLog, Objective, Tag, Task, ThinkingNote, ThinkingNoteTag, WeeklyRecap
+from ...models import Course, CourseDeadline, DailyLog, Objective, Tag, Task, ThinkingNote, ThinkingNoteTag, WeeklyRecap
+from ..courses.deadline_kinds import DEADLINE_KIND_LABELS
 from ..dates import get_iso_week_id
-from .projected_notes import DaySnapshot, IdeaSnapshot, ObjectiveSnapshot, TaskSnapshot
+from .projected_notes import CourseSnapshot, DaySnapshot, DeadlineSnapshot, IdeaSnapshot, ObjectiveSnapshot, TaskSnapshot
 
 IDEA_TITLE_LENGTH = 60
 
@@ -22,6 +23,7 @@ class TrackerSnapshot:
     week_recaps: dict[str, str]
     objectives: list[ObjectiveSnapshot]
     ideas: list[IdeaSnapshot]
+    courses: list[CourseSnapshot] = field(default_factory=list)
 
     def days_by_week(self) -> dict[str, list[DaySnapshot]]:
         grouped_days: dict[str, list[DaySnapshot]] = defaultdict(list)
@@ -44,6 +46,7 @@ def load_tracker_snapshot(db: Session, user_id: str) -> TrackerSnapshot:
         week_recaps={recap.weekId: recap.text for recap in db.scalars(select(WeeklyRecap).where(WeeklyRecap.userId == user_id))},
         objectives=[_snapshot_objective(objective, tasks) for objective in objectives],
         ideas=_load_ideas(db, user_id),
+        courses=_load_courses(db, user_id),
     )
     return snapshot
 
@@ -83,6 +86,20 @@ def _snapshot_objective(objective: Objective, tasks: list[TaskSnapshot]) -> Obje
         tasks=[task for task in tasks if task.objective_id == objective.id],
     )
     return objective_snapshot
+
+
+def _load_courses(db: Session, user_id: str) -> list[CourseSnapshot]:
+    deadlines_by_course: dict[str, list[DeadlineSnapshot]] = defaultdict(list)
+    for deadline in db.scalars(select(CourseDeadline).where(CourseDeadline.userId == user_id).order_by(CourseDeadline.date.asc())):
+        if deadline.courseId:
+            deadlines_by_course[deadline.courseId].append(DeadlineSnapshot(
+                deadline.title, DEADLINE_KIND_LABELS.get(deadline.kind, ""), deadline.date, deadline.time, deadline.note,
+            ))
+    courses = [
+        CourseSnapshot(course.id, course.name, deadlines_by_course.get(course.id, []))
+        for course in db.scalars(select(Course).where(Course.userId == user_id, Course.archived.is_(False)))
+    ]
+    return courses
 
 
 def _load_ideas(db: Session, user_id: str) -> list[IdeaSnapshot]:

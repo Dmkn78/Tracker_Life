@@ -3,6 +3,8 @@ import { WeekBoardView } from "@/features/week/components/WeekBoardView";
 import { GoalsView } from "@/features/goals/components/GoalsView";
 import { KnowledgeView } from "@/features/knowledge/components/KnowledgeView";
 import { InsightsView } from "@/features/insights/components/InsightsView";
+import { PlanningBoardView } from "@/features/planning/components/PlanningBoardView";
+import { CoursesView } from "@/features/courses/components/CoursesView";
 import { LifeDashboardContent } from "@/features/life-terminal/components/LifeDashboardContent";
 import { LifeTerminalClient } from "@/features/life-terminal/components/LifeTerminalClient";
 import { parseLifeTerminalData } from "@/features/life-terminal/api/lifeTerminalApi";
@@ -47,6 +49,8 @@ export default function MobileFeaturePages({ route, serverScope }: { route: Mobi
     case "objectives": return <GoalsView />;
     case "knowledge": return <KnowledgeView />;
     case "insights": return <InsightsView />;
+    case "objectives-planning": return <PlanningBoardView />;
+    case "courses": return <CoursesView />;
     case "life": return <MobileResource load={loadTerminal}>{data => <LifeDashboardContent data={data} />}</MobileResource>;
     case "life-terminal": return <MobileResource load={loadTerminal}>{data => <LifeTerminalClient data={data} />}</MobileResource>;
     default: return null;

@@ -208,6 +208,7 @@ La décomposition d'objectif utilise le même principe : propositions seulement,
 | P1 | Importer les notes « Réflexion » dans `Inbox/` puis retirer l'écran Réflexion (aujourd'hui elles sont projetées en lecture dans `Tracker/Idées/`) | À faire |
 | P1 | Raison facultative lors du « pas faite » sur la Semaine (alimente les blocages récurrents) | À faire |
 | P1 | Suggestion IA de tags/domaine pour les notes de l'Inbox, en proposition à valider | À faire |
+| P1 | Vue Planifier, rubrique Cours avec Google Agenda, période d'analyse personnalisée | Fait (§9) |
 | P2 | Fusionner Terminal, Vie et Performance en un seul tableau de bord facultatif ; fusionner Répartition du temps et Calendrier | À décider après usage |
 | P2 | Tâches récurrentes simples (« chaque lundi ») sur la Semaine | À faire |
 | P2 | Embeddings optionnels (§3.5) | Si la recherche lexicale s'avère insuffisante |
@@ -306,3 +307,42 @@ Objectif : noter une tâche ou une note en quelques secondes, sans ouvrir l'appl
 - Un serveur injoignable (connexion impossible en 5 s) n'est plus présenté comme un modèle lent : le message indique l'adresse et les causes probables (écoute réseau de LM Studio/Ollama, pare-feu).
 - Pour un fournisseur local, l'analyse envoie au plus 12 000 caractères de sources (30 000 en cloud) et l'assistant 10 000 (24 000 en cloud), pour limiter le temps de lecture du prompt.
 - L'app Android coupait toutes les requêtes non listées à 15 s, y compris les analyses et la décomposition d'objectifs ; les délais par chemin sont maintenant dans `mobile/nativeReadTimeout.ts`.
+
+---
+
+## 9. Planifier, Cours et période d'analyse (ajout du 5 novembre)
+
+### Planifier (`/objectives/planning`)
+
+L'ancienne page « Planification des objectifs », jugée trop chargée, devient une vue de planification simple :
+- à gauche, **Tâches à planifier** : un champ pour ajouter une tâche, un objectif facultatif, et les tâches groupées par objectif ;
+- à droite, les **7 jours** de la semaine choisie ;
+- on **glisse** une tâche de la liste vers un jour (et inversement), ou on touche **« Planifier »** puis le jour (pratique au téléphone : seuls les jours à venir sont proposés) ;
+- les flèches de semaine permettent de **planifier à l'avance** ;
+- les examens et rendus des cours s'affichent sur leur jour.
+
+Elle utilise les mêmes données que la Semaine (`/api/week`) : une tâche planifiée ici apparaît immédiatement sur la Semaine. L'ancienne vue détaillée (jalons, PERT, prévisions) reste disponible sous « Prévisions des objectifs » (`/objectives/forecasts`).
+
+### Cours (`/courses`)
+
+- Un cours = un nom. Une date importante = un titre et une date ; le type (Examen, Rendu, Date importante) et l'heure sont facultatifs. Il existe aussi un groupe « Autres dates importantes » sans cours.
+- « Prochaines échéances » liste les 60 prochains jours avec un compte à rebours ; les dates de moins d'une semaine sont mises en évidence.
+- **Google Agenda** : chaque date a un bouton qui ouvre Google Agenda (application ou web) avec l'événement prérempli (journée entière, ou heure de début et durée). **Tout exporter (.ics)** télécharge les dates à venir, importables dans Google Agenda ou ouvrables par le téléphone, avec un rappel la veille. Dans l'app Android, l'export de fichier n'est pas proposé : on passe par le bouton de chaque date.
+- Les dates sont stockées en date et heure locales (table `CourseDeadline`), comme les tâches, pour qu'un examen « toute la journée » ne change jamais de jour à cause des fuseaux horaires.
+- Chaque cours a sa note dans le coffre (`Tracker/Cours/<nom>.md`) avec ses échéances ; tes notes de cours s'écrivent sous le bloc généré.
+- Migration : `prisma/migrations/20261105120000_courses_deadlines`.
+
+### Analyser
+
+En plus de 7, 28 et 90 jours, une **période personnalisée** avec deux sélecteurs de date (au plus un an, début avant fin). Les constats calculés et les questions portent sur cette période.
+
+### Vérifié
+
+Parcours Playwright sur ordinateur et sur Pixel 7 émulé :
+- planification par glisser-déposer et par puces, retour dans la liste, planification sur la semaine suivante, regroupement par objectif ;
+- création d'un cours et d'un examen ; vérification du compte à rebours, du lien Google Agenda (dates et intitulé) et de l'export `.ics` ; examen affiché sur la Semaine ;
+- période personnalisée, y compris le refus d'une période inversée ;
+- navigation à 6 entrées de l'app téléphone.
+
+Non vérifié : l'ouverture réelle de Google Agenda sur un téléphone et l'import du fichier `.ics` dans Google Agenda.
+

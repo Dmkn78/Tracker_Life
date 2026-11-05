@@ -7,28 +7,34 @@ import { useDefaultAiProvider } from "@/features/ai-providers/application/useDef
 import { useLocale } from "@/features/interface/localization/LocaleProvider";
 import { toDateKey } from "@/lib/dates";
 import { askHistory, fetchPatterns } from "../api/insightsApi";
-import { PERIOD_PRESETS, periodFromPreset, type HistoryPatterns, type InsightResult, type PeriodPreset } from "../domain/insights";
+import { PERIOD_PRESETS, findCustomPeriodProblem, periodFromPreset, type AnalysisPeriod, type HistoryPatterns, type InsightResult, type PeriodPreset } from "../domain/insights";
 import { AnswerPanel } from "./AnswerPanel";
 import { INSIGHTS_COPY, type InsightsCopy } from "./insightsCopy";
 import { PatternsPanel } from "./PatternsPanel";
 
 const DEFAULT_PERIOD_PRESET: PeriodPreset = 28;
 
+type PeriodChoice = { kind: "preset"; days: PeriodPreset } | { kind: "custom"; period: AnalysisPeriod };
+
 type AnswerState = { kind: "idle" } | { kind: "asking" } | { kind: "answered"; result: InsightResult } | { kind: "failed"; message: string };
 
 export function InsightsView(): React.ReactElement {
   const { locale } = useLocale();
   const copy = INSIGHTS_COPY[locale];
-  const [preset, setPreset] = useState<PeriodPreset>(DEFAULT_PERIOD_PRESET);
+  const [choice, setChoice] = useState<PeriodChoice>({ kind: "preset", days: DEFAULT_PERIOD_PRESET });
+  const [customDraft, setCustomDraft] = useState<AnalysisPeriod>(() => periodFromPreset(DEFAULT_PERIOD_PRESET, toDateKey()));
   const [patterns, setPatterns] = useState<HistoryPatterns | null>(null);
-  const period = periodFromPreset(preset, toDateKey());
+  const period = choice.kind === "preset" ? periodFromPreset(choice.days, toDateKey()) : choice.period;
+  const periodKey = `${period.from}:${period.to}`;
+  const customProblem = findCustomPeriodProblem(customDraft);
 
   useEffect(() => {
     const controller = new AbortController();
+    const [from, to] = periodKey.split(":");
     setPatterns(null);
-    fetchPatterns(periodFromPreset(preset, toDateKey()), controller.signal).then(setPatterns).catch(() => undefined);
+    fetchPatterns({ from, to }, controller.signal).then(setPatterns).catch(() => undefined);
     return () => controller.abort();
-  }, [preset]);
+  }, [periodKey]);
 
   return (
     <div className="grid gap-5">
@@ -40,11 +46,22 @@ export function InsightsView(): React.ReactElement {
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label={copy.period}>
         <span className="text-sm text-muted">{copy.period} :</span>
         {PERIOD_PRESETS.map((candidate) => (
-          <SegmentedButton key={candidate} type="button" active={candidate === preset} onClick={() => setPreset(candidate)} className="ring-1 ring-line">{copy.days.replace("{count}", String(candidate))}</SegmentedButton>
+          <SegmentedButton key={candidate} type="button" active={choice.kind === "preset" && candidate === choice.days} onClick={() => setChoice({ kind: "preset", days: candidate })} className="ring-1 ring-line">{copy.days.replace("{count}", String(candidate))}</SegmentedButton>
         ))}
       </div>
+      <form
+        onSubmit={(event) => { event.preventDefault(); if (!customProblem) setChoice({ kind: "custom", period: customDraft }); }}
+        className={`flex flex-wrap items-end gap-2 rounded-[18px] p-3 ring-1 ${choice.kind === "custom" ? "bg-accent/10 ring-accent/50" : "bg-panel2/40 ring-line"}`}
+      >
+        <span className="w-full text-xs font-semibold uppercase text-muted">{copy.customPeriod}</span>
+        <label className="grid gap-1 text-xs text-muted">{copy.from}<input type="date" value={customDraft.from} max={customDraft.to || undefined} onChange={(event) => setCustomDraft((current) => ({ ...current, from: event.target.value }))} className="focus-ring min-h-10 rounded-xl bg-panel px-2 text-sm text-ink ring-1 ring-line" /></label>
+        <label className="grid gap-1 text-xs text-muted">{copy.to}<input type="date" value={customDraft.to} min={customDraft.from || undefined} onChange={(event) => setCustomDraft((current) => ({ ...current, to: event.target.value }))} className="focus-ring min-h-10 rounded-xl bg-panel px-2 text-sm text-ink ring-1 ring-line" /></label>
+        <SecondaryButton type="submit" disabled={customProblem !== null}>{copy.applyPeriod}</SecondaryButton>
+        {customProblem ? <p className="w-full text-xs text-warn">{copy.periodProblems[customProblem]}</p> : null}
+      </form>
+      <p className="text-xs text-muted">{copy.analysedPeriod} : {period.from} → {period.to}</p>
       {patterns ? <PatternsPanel patterns={patterns} copy={copy} /> : null}
-      <QuestionBox key={preset} copy={copy} period={period} />
+      <QuestionBox key={periodKey} copy={copy} period={period} />
     </div>
   );
 }

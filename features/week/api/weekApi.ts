@@ -1,5 +1,5 @@
 import { expectJsonObject, expectNullableString, expectNumber, expectString, parseJsonArray, requestJson } from "@/lib/http/apiClient";
-import { BOARD_TASK_STATUSES, type BoardDay, type BoardTask, type BoardTaskStatus, type WeekBoard, type WeekSummary } from "../domain/weekBoard";
+import { BOARD_TASK_STATUSES, type BoardDay, type BoardDeadline, type BoardTask, type BoardTaskStatus, type WeekBoard, type WeekSummary } from "../domain/weekBoard";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -35,9 +35,24 @@ function parseBoardDay(payload: unknown, context: string): BoardDay {
   const boardDay: BoardDay = {
     date: expectString(day.date, `${context}.date`),
     tasks: parseJsonArray(day.tasks, `${context}.tasks`, parseBoardTask),
-    recap: expectNullableString(day.recap, `${context}.recap`)
+    recap: expectNullableString(day.recap, `${context}.recap`),
+    deadlines: parseJsonArray(day.deadlines ?? [], `${context}.deadlines`, parseBoardDeadline)
   };
   return boardDay;
+}
+
+function parseBoardDeadline(payload: unknown, context: string): BoardDeadline {
+  const deadline = expectJsonObject(payload, context);
+  const boardDeadline: BoardDeadline = {
+    id: expectString(deadline.id, `${context}.id`),
+    title: expectString(deadline.title, `${context}.title`),
+    kind: expectString(deadline.kind, `${context}.kind`),
+    kindLabel: expectString(deadline.kindLabel, `${context}.kindLabel`),
+    time: expectNullableString(deadline.time, `${context}.time`),
+    courseName: expectNullableString(deadline.courseName, `${context}.courseName`),
+    courseColor: expectNullableString(deadline.courseColor, `${context}.courseColor`)
+  };
+  return boardDeadline;
 }
 
 function parseBoardTask(payload: unknown, context: string): BoardTask {

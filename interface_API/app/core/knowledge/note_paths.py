@@ -9,6 +9,7 @@ JOURNAL_FOLDER = f"{TRACKER_FOLDER}/Journal"
 WEEK_FOLDER = f"{TRACKER_FOLDER}/Semaines"
 OBJECTIVE_FOLDER = f"{TRACKER_FOLDER}/Objectifs"
 IDEA_FOLDER = f"{TRACKER_FOLDER}/Idées"
+COURSE_FOLDER = f"{TRACKER_FOLDER}/Cours"
 INBOX_FOLDER = "Inbox"
 MAX_SLUG_LENGTH = 80
 # Characters Obsidian refuses in file names, plus those that break wikilinks.
@@ -25,6 +26,10 @@ def week_note_path(week_id: str) -> str:
 
 def objective_note_path(title: str) -> str:
     return f"{OBJECTIVE_FOLDER}/{slugify_title(title)}.md"
+
+
+def course_note_path(name: str) -> str:
+    return f"{COURSE_FOLDER}/{slugify_title(name)}.md"
 
 
 def idea_note_path(date_key: str, title: str) -> str:

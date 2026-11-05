@@ -9,6 +9,7 @@ from ..dates import get_iso_week_id, get_week_date_keys, parse_date_key
 from ..week_board import summarize_task_statuses
 from .french_dates import format_long_date, format_short_date
 from .note_paths import (
+    course_note_path,
     idea_note_path,
     journal_note_path,
     objective_note_path,
@@ -64,6 +65,22 @@ class IdeaSnapshot:
     content: str
     created_on: date
     tags: list[str]
+
+
+@dataclass(frozen=True)
+class DeadlineSnapshot:
+    title: str
+    kind_label: str
+    day: date
+    time: str | None
+    note: str | None
+
+
+@dataclass(frozen=True)
+class CourseSnapshot:
+    course_id: str
+    name: str
+    deadlines: list[DeadlineSnapshot]
 
 
 @dataclass(frozen=True)
@@ -148,6 +165,26 @@ def project_idea(snapshot: IdeaSnapshot) -> ProjectedNote:
     tracker_id = f"idée:{snapshot.note_id}"
     projected_note = ProjectedNote(tracker_id, idea_note_path(snapshot.created_on.isoformat(), snapshot.title), frontmatter, body)
     return projected_note
+
+
+def project_course(snapshot: CourseSnapshot, today: date) -> ProjectedNote:
+    """Dates are generated; the user's own lecture notes go below the managed block."""
+    upcoming = [deadline for deadline in snapshot.deadlines if deadline.day >= today]
+    past = [deadline for deadline in snapshot.deadlines if deadline.day < today]
+    lines = [f"# {snapshot.name}", "", "## Échéances à venir", *(_deadline_line(deadline) for deadline in upcoming)] if upcoming else [f"# {snapshot.name}", "", "## Échéances à venir", "_Aucune échéance à venir._"]
+    if past:
+        lines += ["", "## Échéances passées", *(_deadline_line(deadline) for deadline in past)]
+    tracker_id = f"cours:{snapshot.course_id}"
+    frontmatter = {"type": "cours", "tags": ["tracker/cours"], "source": TRACKER_SOURCE, "tracker_id": tracker_id}
+    projected_note = ProjectedNote(tracker_id, course_note_path(snapshot.name), frontmatter, "\n".join(lines))
+    return projected_note
+
+
+def _deadline_line(deadline: DeadlineSnapshot) -> str:
+    time_label = f" à {deadline.time}" if deadline.time else ""
+    note_label = f" — {deadline.note}" if deadline.note else ""
+    line = f"- {format_long_date(deadline.day)}{time_label} · **{deadline.kind_label}** : {deadline.title}{note_label}"
+    return line
 
 
 def _task_line(task: TaskSnapshot, objective_paths: dict[str, str]) -> str:

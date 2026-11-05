@@ -10,7 +10,17 @@ export type BoardTask = {
   objectiveTitle: string | null;
 };
 
-export type BoardDay = { date: string; tasks: BoardTask[]; recap: string | null };
+export type BoardDeadline = {
+  id: string;
+  title: string;
+  kind: string;
+  kindLabel: string;
+  time: string | null;
+  courseName: string | null;
+  courseColor: string | null;
+};
+
+export type BoardDay = { date: string; tasks: BoardTask[]; recap: string | null; deadlines: BoardDeadline[] };
 
 export type WeekSummary = { planned: number; done: number; dropped: number; open: number; completionRate: number };
 

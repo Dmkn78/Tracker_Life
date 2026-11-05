@@ -6,6 +6,8 @@ import { useState } from "react";
 import type { BoardDay } from "../domain/weekBoard";
 import { summarizeDays } from "../domain/weekBoard";
 import { BoardTaskItem, type BoardTaskHandlers } from "./BoardTaskItem";
+import { dayDropId } from "./boardDragAndDrop";
+import { DeadlineBadges } from "./DeadlineBadges";
 import { formatBoardDay } from "./dayLabels";
 import { InlineTaskInput } from "./InlineTaskInput";
 import { RecapField } from "./RecapField";
@@ -21,7 +23,7 @@ export function DayColumn({ day, isToday, isPast, locale, copy, handlers, onAdd,
   onAdd: (title: string) => Promise<void>;
   onRecap: (text: string) => Promise<void>;
 }): React.ReactElement {
-  const { setNodeRef, isOver } = useDroppable({ id: `day:${day.date}` });
+  const { setNodeRef, isOver } = useDroppable({ id: dayDropId(day.date) });
   const [isRecapOpen, setIsRecapOpen] = useState(Boolean(day.recap));
   const label = formatBoardDay(day.date, locale);
   const summary = summarizeDays([day]);
@@ -38,6 +40,7 @@ export function DayColumn({ day, isToday, isPast, locale, copy, handlers, onAdd,
         </h2>
         {isToday ? <span className="whitespace-nowrap rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-onaccent">{copy.today}</span> : summary.planned ? <span className="text-xs text-muted">{summary.done}/{summary.planned}</span> : null}
       </header>
+      <DeadlineBadges deadlines={day.deadlines} />
       <ul className="grid gap-1.5">
         {day.tasks.map((task) => <BoardTaskItem key={task.id} task={task} copy={copy} handlers={handlers} canShift />)}
       </ul>

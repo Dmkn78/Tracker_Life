@@ -7,6 +7,8 @@ test("every mobile section has a route, including the website dashboard aliases"
   assert.equal(parseMobileRoute("/dashboard/life-terminal").page, "life-terminal");
   assert.equal(parseMobileRoute("/dashboard").page, "life-terminal");
   assert.equal(parseMobileRoute("/objectives/planning").page, "objectives-planning");
+  assert.equal(parseMobileRoute("/objectives/forecasts").page, "objectives-forecasts");
+  assert.equal(parseMobileRoute("/courses").page, "courses");
   assert.deepEqual(parseMobileRoute("/knowledge?note=Cours%2FA.md"), { page: "knowledge", search: "?note=Cours%2FA.md" });
 });
 

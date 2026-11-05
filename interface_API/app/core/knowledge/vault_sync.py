@@ -7,7 +7,9 @@ from dataclasses import dataclass, field
 from .managed_block import merge_managed_note
 from .markdown_note import parse_note
 from .note_paths import TRACKER_FOLDER
-from .projected_notes import ProjectedNote, project_day, project_idea, project_objective, project_week
+from datetime import date
+
+from .projected_notes import ProjectedNote, project_course, project_day, project_idea, project_objective, project_week
 from .tracker_snapshot import TrackerSnapshot
 from .vault_store import VaultStore
 
@@ -37,6 +39,7 @@ def sync_tracker_notes(store: VaultStore, snapshot: TrackerSnapshot) -> SyncRepo
         *(project_day(day, objective_paths) for day in snapshot.days),
         *(project_week(week_id, days, snapshot.week_recaps.get(week_id)) for week_id, days in snapshot.days_by_week().items()),
         *(project_idea(idea) for idea in snapshot.ideas),
+        *(project_course(course, date.today()) for course in snapshot.courses),
     ]
     note_paths = {note.tracker_id: objective_paths[note.tracker_id.removeprefix("objectif:")] for note in objective_notes}
     note_paths.update({note.tracker_id: _assign_path(note, existing_paths, used_paths) for note in other_notes})
