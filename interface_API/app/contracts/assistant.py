@@ -1,4 +1,4 @@
-"""Strict contracts for the local assistant's read-only proposals."""
+"""Strict contracts for the assistant's read-only task proposals and day/week reviews."""
 
 from __future__ import annotations
 
@@ -17,25 +17,8 @@ class AssistantContract(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid", strict=True)
 
 
-class ProviderSettings(AssistantContract):
-    base_url: str = Field(min_length=1, max_length=500)
-    model: str = Field(max_length=300)
-    api_key: str | None = Field(default=None, max_length=2000, repr=False)
-
-    @field_validator("base_url", "model", "api_key")
-    @classmethod
-    def reject_control_characters(cls, text: str | None) -> str | None:
-        if text is not None and any(ord(character) < 32 or ord(character) == 127 for character in text):
-            raise ValueError("Control characters are not allowed")
-        return text.strip() if text is not None else None
-
-
-class AssistantModelsRequest(AssistantContract):
-    provider: ProviderSettings
-
-
 class AssistantPreviewRequest(AssistantContract):
-    provider: ProviderSettings
+    provider_id: str | None = Field(default=None, max_length=100)
     prompt: str = Field(max_length=8000)
     date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
     mode: AssistantMode
@@ -48,8 +31,6 @@ class AssistantPreviewRequest(AssistantContract):
 
     @model_validator(mode="after")
     def require_generation_input(self) -> AssistantPreviewRequest:
-        if not self.provider.model:
-            raise ValueError("Select a model before generating a proposal")
         if self.mode == "tasks" and not self.prompt.strip():
             raise ValueError("Describe the tasks to propose")
         return self
@@ -98,7 +79,3 @@ class GeneratedPreview(AssistantContract):
 class AssistantPreviewResponse(GeneratedPreview):
     from_date: str = Field(alias="from")
     to: str
-
-
-class AssistantModelsResponse(AssistantContract):
-    models: list[str]

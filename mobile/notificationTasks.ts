@@ -7,10 +7,14 @@ export function summarizeNotificationTasks(tasks: (Pick<TodoTask, "date" | "stat
   return { date, completed: planned.filter(task => task.status === "done").length, total: planned.length, titles: planned.filter(task => task.status !== "done" && task.title).slice(0, 3).map(task => task.title!.replace(/\s+/g, " ").slice(0, 120)) };
 }
 
-export function notificationDestination(input: string): "create-todo" | "todo" | null {
+export type NotificationDestination = "create-todo" | "create-note" | "todo";
+
+export function notificationDestination(input: string): NotificationDestination | null {
   try {
     const url = new URL(input);
-    if (url.protocol !== "liferegime:" || url.hostname !== "todo" || url.username || url.password || url.search || url.hash) return null;
+    if (url.protocol !== "liferegime:" || url.username || url.password || url.search || url.hash) return null;
+    if (url.hostname === "note") return url.pathname === "/new" ? "create-note" : null;
+    if (url.hostname !== "todo") return null;
     if (url.pathname === "/new") return "create-todo";
     return url.pathname === "" || url.pathname === "/" ? "todo" : null;
   } catch { return null; }

@@ -1,15 +1,15 @@
-# Assistant local avec LM Studio
+# Assistant IA (tous fournisseurs)
 
-L’assistant est accessible depuis **Tâches** et **Logs quotidiens**. Configure le provider dans **Paramètres → Assistant local / LM Studio**.
+L’assistant est accessible depuis **Tâches (avancée)** et **Journal quotidien**. Il utilise le modèle par défaut configuré dans **Paramètres → Modèles d’IA** : LM Studio, Ollama, OpenAI, Anthropic, Google Gemini, OpenRouter ou tout serveur compatible OpenAI. L’architecture multi-fournisseurs est décrite dans [`REFONTE.md`](REFONTE.md).
 
 ## Connexion
 
-1. Dans LM Studio, charge un modèle de conversation capable de produire du JSON structuré et démarre le serveur local.
-2. Renseigne l’adresse du serveur dans les paramètres, par exemple `http://127.0.0.1:1234/v1` lorsque FastAPI et LM Studio tournent sur le même ordinateur.
-3. Si LM Studio demande une authentification, renseigne son jeton. L’adresse et le modèle sont mémorisés dans ce navigateur ; le jeton reste en mémoire pendant la session.
-4. Teste la connexion, récupère la liste des modèles, sélectionne le modèle à utiliser et enregistre la connexion.
+1. Dans **Paramètres → Modèles d’IA**, clique sur « Ajouter un modèle » et choisis le fournisseur.
+2. Pour un fournisseur cloud, colle la clé API : elle est chiffrée sur le serveur et n’est jamais renvoyée au navigateur.
+3. Pour LM Studio ou Ollama, l’adresse par défaut suffit si le modèle tourne sur la même machine que l’API ; sinon ouvre « Adresse personnalisée ».
+4. Teste la connexion, choisis le modèle dans la liste puis enregistre. Le premier modèle enregistré devient le modèle par défaut.
 
-Les appels partent de **FastAPI**, pas du navigateur. Si FastAPI tourne sur un VPS, `127.0.0.1` désigne ce VPS. Pour joindre LM Studio sur ton PC, utilise une adresse IP privée accessible depuis FastAPI (réseau local ou réseau privé comme Tailscale), et active l’écoute réseau dans LM Studio. Les adresses acceptées sont localhost, les IP de loopback, les IP privées LAN, IPv6 ULA et Tailscale ; les noms DNS personnalisés et adresses publiques sont refusés. Le téléphone utilise lui aussi l’API de l’interface : aucune installation de LM Studio sur Android n’est nécessaire.
+Les appels partent de **FastAPI**, pas du navigateur. Si FastAPI tourne sur un VPS, `127.0.0.1` désigne ce VPS : pour joindre LM Studio ou Ollama sur ton PC, utilise une adresse LAN ou Tailscale et active l’écoute réseau du logiciel. `http://` n’est accepté que vers une adresse locale, LAN ou Tailscale ; un service distant doit utiliser `https://`. Le téléphone utilise la même configuration, sans installation supplémentaire.
 
 ## Dicter et créer des tâches
 
@@ -34,4 +34,5 @@ La génération expire si le modèle ne répond pas dans le délai prévu. Un mo
 ## Références
 
 - [API OpenAI compatible de LM Studio](https://lmstudio.ai/docs/developer/openai-compat)
+- [API Ollama](https://github.com/ollama/ollama/blob/main/docs/api.md)
 - [Sorties structurées JSON](https://lmstudio.ai/docs/developer/openai-compat/structured-output)

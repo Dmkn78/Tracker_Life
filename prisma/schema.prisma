@@ -132,6 +132,8 @@ model User {
   tags          Tag[]
   thinkingNotes ThinkingNote[]
   emotionalReviews EmotionalReview[]
+  aiProviders   AiProvider[]
+  weeklyRecaps  WeeklyRecap[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 }
@@ -621,4 +623,34 @@ model BlockRecovery {
   action String
   replacementId String?
   createdAt DateTime @default(now())
+}
+
+/// AI provider connection configured from Settings. The API key is encrypted at rest.
+model AiProvider {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind            String
+  label           String
+  baseUrl         String
+  model           String   @default("")
+  encryptedApiKey String?
+  apiKeyHint      String?
+  isDefault       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// Free-text weekly recap written by the user (the daily recap is DailyLog.textSummary).
+model WeeklyRecap {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekId    String
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, weekId])
 }

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_label">Ajout rapide</string>
+    <string name="widget_description">Ajoute une tâche ou une note sans ouvrir l’application.</string>
+    <string name="widget_prompt">Qu’as-tu à faire ?</string>
+    <string name="widget_add_task">Ajouter une tâche</string>
+    <string name="widget_add_note">Écrire une note</string>
+</resources>

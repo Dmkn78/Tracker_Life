@@ -82,7 +82,7 @@ Chaque capacité utilisateur dispose d’un dossier `features/<feature>` :
 - `api/` : appels HTTP et validation des réponses `unknown` ;
 - `domain/` : types, constantes et fonctions pures propres au métier.
 
-Features actuelles : `auth`, `calendar`, `daily-log`, `habits`, `history`, `life-terminal`, `objectives`, `settings`, `time-allocation` et `todo`.
+Features principales depuis la refonte : `week` (accueil), `goals`, `knowledge` (coffre Obsidian), `insights` (analyses sourcées) et `ai-providers` (modèles d’IA). Features avancées : `auth`, `calendar`, `daily-log`, `habits`, `history`, `life-terminal`, `objectives`, `settings`, `time-allocation` et `todo`. Voir [`REFONTE.md`](REFONTE.md).
 
 ### `components/` et `lib/`
 

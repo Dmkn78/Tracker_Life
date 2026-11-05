@@ -536,7 +536,7 @@ export function TodoClient({ today, initialView = "funnel", createDate, onCreate
           </div>
         }
       >
-        {drawer?.kind === "edit" ? <div className="mb-4 flex flex-wrap gap-2"><SecondaryButton type="button" onClick={() => { const task = tasks.find((item) => item.id === drawer.id); if (task) { setDrawer(null); setExecutionTask(task); } }}>{translate("todo.logExecution")}</SecondaryButton><a className="focus-ring rounded-2xl px-3 py-2 text-sm text-accent" href="/objectives">{fr ? "Ouvrir les objectifs et prévisions" : "Open objectives & forecasts"}</a></div> : null}
+        {drawer?.kind === "edit" ? <div className="mb-4 flex flex-wrap gap-2"><SecondaryButton type="button" onClick={() => { const task = tasks.find((item) => item.id === drawer.id); if (task) { setDrawer(null); setExecutionTask(task); } }}>{translate("todo.logExecution")}</SecondaryButton><a className="focus-ring rounded-2xl px-3 py-2 text-sm text-accent" href="/objectives/planning">{fr ? "Ouvrir les objectifs et prévisions" : "Open objectives & forecasts"}</a></div> : null}
         {drawer ? (
           <form id="task-editor-form" onSubmit={saveTask} className="space-y-4">
             {drawerError || objectiveOptionsError ? (

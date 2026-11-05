@@ -98,7 +98,9 @@ public final class QuickCapturePlugin extends Plugin {
     @PluginMethod public void capture(PluginCall call) {
         try (QuickCaptureStore store = new QuickCaptureStore(getContext())) {
             String scope = getContext().getSharedPreferences(QuickNotification.PREFERENCES, 0).getString("scope", "");
-            store.capture(call.getString("title", ""), scope);
+            String date = call.getString("date", null);
+            store.capture(call.getString("id", null), call.getString("kind", QuickCaptureStore.TASK), call.getString("title", ""), date, scope);
+            QuickNotification.refresh(getContext());
             call.resolve();
         } catch (Exception exception) { call.reject("Unable to preserve capture", exception); }
     }

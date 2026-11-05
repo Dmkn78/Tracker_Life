@@ -25,7 +25,8 @@ La documentation complète se trouve dans [`docs/README.md`](docs/README.md).
 - Guide de maintenance : [`docs/08-MAINTENANCE-ET-REGLES.md`](docs/08-MAINTENANCE-ET-REGLES.md)
 - Performance, capital fictif et rewards : [`docs/performance-mvp.md`](docs/performance-mvp.md)
 - Objectifs, roadmap, exécution, prévisions et mode crème : [`docs/objectives-planning.md`](docs/objectives-planning.md)
-- Assistant local LM Studio, dictée de tâches et analyses : [`docs/lm-studio-assistant.md`](docs/lm-studio-assistant.md)
+- Refonte : Semaine, objectifs en une phrase, IA multi-fournisseurs, second cerveau Obsidian et analyses sourcées : [`docs/REFONTE.md`](docs/REFONTE.md)
+- Assistant IA, dictée de tâches et analyses : [`docs/lm-studio-assistant.md`](docs/lm-studio-assistant.md)
 
 ## Démarrage local rapide sous Windows
 

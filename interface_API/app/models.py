@@ -462,3 +462,29 @@ class BlockRecovery(Base):
     action: Mapped[str] = mapped_column(Text, nullable=False)
     replacementId: Mapped[str | None] = mapped_column(String)
     createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+
+
+class AiProvider(Base):
+    __tablename__ = "AiProvider"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    userId: Mapped[str] = mapped_column(String, nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    baseUrl: Mapped[str] = mapped_column(Text, nullable=False)
+    model: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    encryptedApiKey: Mapped[str | None] = mapped_column(Text)
+    apiKeyHint: Mapped[str | None] = mapped_column(Text)
+    isDefault: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class WeeklyRecap(Base):
+    __tablename__ = "WeeklyRecap"
+
+    userId: Mapped[str] = mapped_column(String, primary_key=True)
+    weekId: Mapped[str] = mapped_column(Text, primary_key=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)

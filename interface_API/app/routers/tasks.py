@@ -307,7 +307,9 @@ def capture_task(body: TaskCaptureRequest, user: User = Depends(get_current_user
             raise HTTPException(409, "Capture identifier already used")
         # A delayed phone retry must not resurrect a deleted task.
         return {"captureId": request_id, "taskId": receipt.taskId, "deleted": receipt.taskId is None}
-    task = _create_one_task(db, user, TaskItem(title=body.title))
+    task = _create_one_task(db, user, TaskItem(title=body.title, date=body.date))
+    if task.date:
+        recompute_around_date(db, user.id, task.date.isoformat())
     db.add(TaskCapture(id=request_id, userId=user.id, taskId=task.id, title=body.title))
     db.flush()
     return {"captureId": request_id, "taskId": task.id, "deleted": False}

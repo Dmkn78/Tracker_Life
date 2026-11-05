@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
-import { CheckSquare, CalendarDays, Target, NotebookPen, Menu, Settings, Plus } from "lucide-react";
+import { BookOpen, CalendarCheck, Target, Sparkles, Menu, Settings } from "lucide-react";
 import { PrimaryButton, SecondaryButton, TextInput, FieldLabel } from "@/components/ui";
 import { InterfaceSettingsPanel } from "@/features/settings/components/InterfaceSettingsPanel";
 import { TodoClient } from "@/features/todo/components/TodoClient";
@@ -14,7 +14,9 @@ import { requestJson, expectJsonObject } from "@/lib/http/apiClient";
 import { connectApi } from "./nativeTransport";
 import { normalizeServerAddress } from "./serverAddress";
 import { describeConnectionError, type ConnectionStage } from "./connectionError";
-import { configureCaptures, disableQuickNotification, listCaptures, showTaskKeyboard, syncCaptures, waitForCaptureSync } from "./quickCapture";
+import { configureCaptures, disableQuickNotification, listCaptures, showTaskKeyboard, submitOrQueueCapture, syncCaptures, waitForCaptureSync } from "./quickCapture";
+import { QuickCaptureLauncher } from "@/features/quick-capture/components/QuickCaptureLauncher";
+import { CAPTURE_SAVED_EVENT, OPEN_CAPTURE_EVENT, type CaptureKind } from "@/features/quick-capture/domain/quickCapture";
 import { notificationDestination } from "./notificationTasks";
 import { useNotificationSummary } from "./useNotificationSummary";
 import { mobileRouteHref, parseMobileRoute, type MobilePage, type MobileRoute } from "./routes";
@@ -28,12 +30,20 @@ const MobileFeaturePages = lazy(() => import("./MobileFeaturePages"));
 const SERVER_STORAGE_KEY = "life-regime:server";
 const HTTP_SERVER_STORAGE_KEY = "life-regime:http-server";
 const navigation = [
-  { id: "todo", title: "Tâches", icon: CheckSquare },
-  { id: "funnel", title: "Planning", icon: CalendarDays },
-  { id: "daily-log", title: "Logs", icon: NotebookPen },
+  { id: "home", title: "Semaine", icon: CalendarCheck },
   { id: "objectives", title: "Objectifs", icon: Target },
+  { id: "knowledge", title: "Notes", icon: BookOpen },
+  { id: "insights", title: "Analyser", icon: Sparkles },
   { id: "more", title: "Plus", icon: Menu }
 ] as const;
+/** Pages rendered directly here; every other page comes from the lazily loaded MobileFeaturePages. */
+const SHELL_PAGES: readonly MobilePage[] = ["todo", "funnel", "objectives-planning", "performance", "settings", "more"];
+
+function openQuickCapture(kind: CaptureKind): void {
+  window.dispatchEvent(new CustomEvent(OPEN_CAPTURE_EVENT, { detail: kind }));
+  // Android WebViews do not always raise the keyboard for a programmatic focus.
+  window.setTimeout(() => { void showTaskKeyboard().catch(() => undefined); }, 150);
+}
 
 export function MobileApp() {
   const [server, setServer] = useState(localStorage.getItem(SERVER_STORAGE_KEY) ?? (Capacitor.isNativePlatform() ? "" : location.origin));
@@ -41,14 +51,13 @@ export function MobileApp() {
   const [approvedHttpServer, setApprovedHttpServer] = useState(localStorage.getItem(HTTP_SERVER_STORAGE_KEY) ?? "");
   const [allowHttpDraft, setAllowHttpDraft] = useState(Boolean(server && approvedHttpServer === server));
   const [accessKey, setAccessKey] = useState("");
-  const [route, setRoute] = useState<MobileRoute>(() => parseMobileRoute(location.hash) ?? { page: server ? "funnel" : "settings", search: "" });
+  const [route, setRoute] = useState<MobileRoute>(() => parseMobileRoute(location.hash) ?? { page: server ? "home" : "settings", search: "" });
   const page = route.page;
   const setPage = useCallback((destination: MobilePage) => {
     setRoute({ page: destination, search: "" });
     navigateMobile(mobileRouteHref(destination));
   }, []);
   const [ready, setReady] = useState(false);
-  const [creationDate, setCreationDate] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -57,17 +66,6 @@ export function MobileApp() {
   const isChangingServer = useRef(false);
   const notification = useNotificationSummary(server, ready, revision);
 
-  const requestTaskCreation = useCallback(() => {
-    setError(""); setCreationDate(toDateKey()); setPage("todo");
-  }, [setPage]);
-  const creationOpened = useCallback(() => {
-    setCreationDate(null);
-    void showTaskKeyboard().catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    if (creationDate) setPage(ready ? "todo" : "settings");
-  }, [creationDate, ready, setPage]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -75,19 +73,24 @@ export function MobileApp() {
     const navigate = (url: string) => {
       if (disposed) return;
       const destination = notificationDestination(url);
-      if (destination === "create-todo") requestTaskCreation();
-      else if (destination === "todo") setPage("todo");
+      if (destination === "create-todo") openQuickCapture("task");
+      else if (destination === "create-note") openQuickCapture("note");
+      else if (destination === "todo") setPage("home");
     };
     const listener = App.addListener("appUrlOpen", ({ url }) => navigate(url));
     void App.getLaunchUrl().then(launch => { if (launch?.url) navigate(launch.url); }).catch(() => undefined);
     return () => { disposed = true; void listener.then(handle => handle.remove()); };
-  }, [requestTaskCreation, setPage]);
+  }, [setPage]);
 
   const synchronize = useCallback(async () => {
     if (!server || isChangingServer.current) return;
     try {
       const sent = await syncCaptures();
-      if (sent) { setRevision((current) => current + 1); setMessage(`${sent} tâche(s) ajoutée(s) à l’entonnoir.`); }
+      if (sent) {
+        setRevision((current) => current + 1);
+        setMessage(`${sent} ajout(s) du téléphone synchronisé(s).`);
+        window.dispatchEvent(new CustomEvent(CAPTURE_SAVED_EVENT));
+      }
       setPending((await listCaptures()).length);
     } catch {
       try { setPending((await listCaptures()).length); }
@@ -118,6 +121,8 @@ export function MobileApp() {
       if (destination) setRoute(destination);
     };
     const refresh = () => setRevision(value => value + 1);
+    const refreshPending = () => { void listCaptures().then((captures) => setPending(captures.length)).catch(() => undefined); };
+    window.addEventListener(CAPTURE_SAVED_EVENT, refreshPending);
     const logout = () => { setReady(false); setPage("settings"); void disableQuickNotification(); };
     window.addEventListener("hashchange", navigate);
     window.addEventListener(MOBILE_REFRESH_EVENT, refresh);
@@ -126,6 +131,7 @@ export function MobileApp() {
       window.removeEventListener("hashchange", navigate);
       window.removeEventListener(MOBILE_REFRESH_EVENT, refresh);
       window.removeEventListener(MOBILE_LOGOUT_EVENT, logout);
+      window.removeEventListener(CAPTURE_SAVED_EVENT, refreshPending);
     };
   }, [setPage]);
 
@@ -152,7 +158,7 @@ export function MobileApp() {
       if (approvedOrigin) localStorage.setItem(HTTP_SERVER_STORAGE_KEY, approvedOrigin);
       else localStorage.removeItem(HTTP_SERVER_STORAGE_KEY);
       setApprovedHttpServer(approvedOrigin); setServerDraft(origin);
-      setServer(origin); setReady(true); setAccessKey(""); setPage(creationDate ? "todo" : "funnel");
+      setServer(origin); setReady(true); setAccessKey(""); setPage("home");
       setRevision((current) => current + 1);
       connected = true;
     } catch (cause) {
@@ -182,18 +188,18 @@ export function MobileApp() {
   }
 
   return <div className="mobile-app" onClickCapture={interceptLink} onSubmitCapture={interceptNavigationForm}>
-    <header className="mobile-header"><span className="font-semibold">Life Regime</span><div className="flex gap-2"><button className="focus-ring rounded-xl p-3" aria-label="Réglages" onClick={() => setPage("settings")}><Settings className="h-5 w-5" /></button><button className="focus-ring rounded-xl bg-accent px-4 py-2 text-onaccent" aria-label="Ajouter rapidement une tâche" disabled={!ready} onClick={requestTaskCreation}><Plus className="h-5 w-5" /></button></div></header>
+    <header className="mobile-header"><span className="font-semibold">Life Regime</span><div className="flex gap-2"><button className="focus-ring rounded-xl p-3" aria-label="Réglages" onClick={() => setPage("settings")}><Settings className="h-5 w-5" /></button></div></header>
     <main className="mobile-content">
       {page !== "settings" && <><InterfaceUpdateControl server={server} settings={false} /><AppUpdateControl key={server} server={server} ready={ready} presentation="notice" /></>}
       {message ? <p role="status" className="mb-3 rounded-xl bg-panel2 p-3 text-xs">{message}</p> : null}
       {pending ? <div className="mb-3 flex items-center justify-between gap-2 rounded-xl bg-panel p-3 text-xs"><span>{pending} capture(s) en attente</span><SecondaryButton onClick={() => void synchronize()}>Synchroniser</SecondaryButton></div> : null}
       {error ? <p role="alert" className="mb-3 text-sm text-risk">{error}</p> : null}
-      {ready && page === "todo" ? <TodoClient key="todo" today={toDateKey()} refreshKey={revision} createDate={creationDate} onCreateOpened={creationOpened} /> : null}
+      {ready && page === "todo" ? <TodoClient key="todo" today={toDateKey()} refreshKey={revision} /> : null}
       {ready && page === "funnel" ? <TodoClient key="funnel" today={toDateKey()} refreshKey={revision} initialView="funnel" /> : null}
-      {ready && page === "objectives" ? <MobileObjectives key={revision} /> : null}
+      {ready && page === "objectives-planning" ? <MobileObjectives key={revision} /> : null}
       {ready && page === "performance" ? <PerformanceClient key={revision} /> : null}
       {page === "more" ? <MobileMenu navigate={setPage} /> : null}
-      {ready && !["todo", "funnel", "objectives", "performance", "settings", "more"].includes(page) ? <Suspense fallback={<p role="status">Chargement…</p>}><MobileFeaturePages key={`${server}:${page}`} route={route} serverScope={server} /></Suspense> : null}
+      {ready && !SHELL_PAGES.includes(page) ? <Suspense fallback={<p role="status">Chargement…</p>}><MobileFeaturePages key={`${server}:${page}`} route={route} serverScope={server} /></Suspense> : null}
       {page === "settings" ? <section className="space-y-5">
         <h1 className="text-xl font-semibold">Mon téléphone</h1>
         <InterfaceSettingsPanel />
@@ -214,6 +220,7 @@ export function MobileApp() {
         <AppUpdateControl server={server} ready={ready} />
       </section> : !ready ? <p className="text-sm text-muted">Configure la connexion dans Réglages pour commencer.</p> : null}
     </main>
+    {ready ? <QuickCaptureLauncher submitCapture={submitOrQueueCapture} buttonClassName="right-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))]" /> : null}
     <nav className="mobile-navigation" aria-label="Navigation principale">{navigation.map(({ id, title: label, icon: Icon }) => <button key={id} aria-current={page === id ? "page" : undefined} className={`focus-ring flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[10px] ${page === id ? "bg-accent/10 text-accent" : "text-muted"}`} onClick={() => setPage(id)}><Icon className="h-5 w-5" />{label}</button>)}</nav>
   </div>;
 }

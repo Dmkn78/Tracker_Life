@@ -20,3 +20,6 @@ android/build/
 
 # Generated mobile interface published alongside the website
 public/mobile-app/
+
+# Default local knowledge vault (point KNOWLEDGE_VAULT_DIR at your Obsidian vault)
+/data/

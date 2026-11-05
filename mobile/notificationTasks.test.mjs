@@ -14,6 +14,8 @@ test("notification counts real tasks for its day, excluding cancelled and undate
 
 test("notification actions route to the existing To-do or its creation form", () => {
   assert.equal(notificationDestination("liferegime://todo/new"), "create-todo");
+  assert.equal(notificationDestination("liferegime://note/new"), "create-note");
+  assert.equal(notificationDestination("liferegime://note"), null);
   assert.equal(notificationDestination("liferegime://todo"), "todo");
   assert.equal(notificationDestination("liferegime://todo/"), "todo");
   for (const url of ["https://todo/new", "liferegime://settings", "liferegime://todo/delete", "liferegime://todo/new?date=2000-01-01", "bad-url"]) {

@@ -20,7 +20,7 @@
     "test:calendar": "node --experimental-strip-types --test features/calendar/domain/calendarLayers.test.mjs",
     "test:time-allocation": "node --experimental-strip-types --test features/time-allocation/domain/allocationPeriod.test.mjs features/time-allocation/domain/timeAllocationParser.test.mjs",
     "test:api": "scripts\\test-api.cmd",
-    "check": "pnpm typecheck && pnpm test:appearance && pnpm test:todo && pnpm test:habits && pnpm test:daily-log && pnpm test:assistant && pnpm test:emotional && pnpm test:calendar && pnpm test:time-allocation && pnpm test:mobile && pnpm test:android-release && pnpm test:api && pnpm build",
+    "check": "pnpm typecheck && pnpm test:appearance && pnpm test:todo && pnpm test:habits && pnpm test:daily-log && pnpm test:assistant && pnpm test:week && pnpm test:emotional && pnpm test:calendar && pnpm test:time-allocation && pnpm test:mobile && pnpm test:android-release && pnpm test:api && pnpm build",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "build:web": "node scripts/build-website.mjs",
@@ -33,7 +33,8 @@
     "android:release": "node scripts/package-android-release.mjs",
     "capacitor:sync:after": "node scripts/sync-android-custom.mjs",
     "test:mobile": "node --experimental-strip-types --test mobile/*.test.mjs",
-    "test:android-release": "node --test scripts/package-android-release.test.mjs"
+    "test:android-release": "node --test scripts/package-android-release.test.mjs",
+    "test:week": "node --experimental-strip-types --test features/week/domain/weekBoard.test.mjs features/goals/domain/goal.test.mjs features/knowledge/domain/knowledge.test.mjs features/insights/domain/insights.test.mjs features/quick-capture/domain/quickCapture.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

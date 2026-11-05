@@ -10,14 +10,18 @@ from fastapi.responses import JSONResponse
 
 from .config import get_settings
 from .routers import (
+    ai_providers,
     assistant,
     auth,
     calendar_events,
     companies,
     daily_log,
     emotional_reviews,
+    goals,
     habits,
     history,
+    insights,
+    knowledge,
     life_terminal,
     mobile_update,
     objectives,
@@ -32,6 +36,7 @@ from .routers import (
     time_allocation,
     transcribe,
     transcription_jobs,
+    week,
 )
 
 logger = logging.getLogger(__name__)
@@ -97,6 +102,7 @@ def health() -> dict[str, bool]:
 
 app.include_router(auth.router)
 app.include_router(assistant.router)
+app.include_router(ai_providers.router)
 app.include_router(objective_planning.router)
 app.include_router(daily_log.router)
 app.include_router(emotional_reviews.router)
@@ -117,3 +123,7 @@ app.include_router(transcription_jobs.router)
 app.include_router(companies.router)
 app.include_router(tags.router)
 app.include_router(thinking_notes.router)
+app.include_router(week.router)
+app.include_router(knowledge.router)
+app.include_router(insights.router)
+app.include_router(goals.router)

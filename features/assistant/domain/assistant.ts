@@ -1,7 +1,6 @@
 import type { TodoImportance } from "@/features/todo/domain/todoTask";
 
 export type AssistantMode = "tasks" | "day" | "week";
-export type AssistantProvider = { baseUrl: string; model: string; apiKey?: string };
 export type AssistantTask = {
   title: string;
   description: string | null;
