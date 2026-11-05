@@ -107,3 +107,55 @@ jobs:
       contents: write
     uses: ./.github/workflows/android-release.yml
     secrets: inherit
+
+  deploy-vps:
+    name: Deploy to VPS
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.validate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production
+    env:
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      VPS_SSH_HOST_KEY: ${{ secrets.VPS_SSH_HOST_KEY }}
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Prepare SSH credentials
+        run: |
+          set -euo pipefail
+          for var in VPS_SSH_KEY VPS_SSH_HOST_KEY VPS_HOST VPS_USER; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error::Required GitHub secret $var is not set"
+              exit 1
+            fi
+          done
+          install -d -m 700 "$HOME/.ssh"
+          umask 077
+          printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/vps_deploy"
+          chmod 600 "$HOME/.ssh/vps_deploy"
+          printf '%s\n' "$VPS_SSH_HOST_KEY" > "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
+
+      - name: Run deploy.sh on VPS
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/vps_deploy" \
+            -o BatchMode=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=30 \
+            "$VPS_USER@$VPS_HOST" \
+            "cd /opt/interface_API && bash scripts/deploy.sh $GITHUB_SHA"
+
+      - name: Public health check
+        run: |
+          set -euo pipefail
+          curl -fsSk --max-time 30 "https://$VPS_HOST/api/health"
+          curl -fsSk -o /dev/null --max-time 30 "https://$VPS_HOST/"
