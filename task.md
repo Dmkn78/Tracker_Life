@@ -1,6 +1,6 @@
 # Plan de travail approuvé
 
-Dernière mise à jour : 2026-08-15
+Dernière mise à jour : 2026-11-10
 
 Légende : `[ ]` à faire, `[-]` en cours, `[x]` terminé, `[!]` bloqué ou partiellement vérifié.
 
@@ -85,3 +85,16 @@ Légende : `[ ]` à faire, `[-]` en cours, `[x]` terminé, `[!]` bloqué ou part
 - [x] Ajouter le déploiement versionné IIS avec health-check et rollback automatique.
 - [x] Documenter les prérequis VM, variables GitHub, permissions, premier déploiement, rollback et vérification.
 - [!] Migrer l'application actuelle (cookies, Prisma, routes API et rendu serveur Next) vers une architecture réellement exportable avant activation effective du déploiement statique.
+
+## Idées / Backlog (non validé)
+
+Ces éléments sont des idées à cadrer. Présenter un plan et obtenir la validation avant toute implémentation.
+
+- [ ] Templates de journée : créer des modèles réutilisables (ex. journée travail, journée cours, journée repos) qui pré-remplissent le Daily Log et/ou les blocs de temps.
+- [ ] Rappels mobiles : notifications à heures fixes, du type alarme (ex. « début de la session de cours à 9h », « bilan du soir à 22h »), liées aux routines et blocs de time blocking. Piste : notifications locales Capacitor sur Android.
+- [ ] Avancement des cours : vue de progression par cours (chapitres, statut, dernière séance, pourcentage) éditable directement dans l'app, sans passer par un fichier versionné ni un push.
+- [ ] Avancement des cours : import/export CSV ou Excel pour sauvegarder ou éditer en masse.
+- [ ] Suggestion : rappel de bilan du soir si le Daily Log du jour n'est pas rempli.
+- [ ] Suggestion : bouton « dupliquer la veille » dans le Daily Log et la planification.
+- [ ] Suggestion : export CSV des Daily Log, To-Do et Time Allocation pour analyse externe.
+- [ ] Suggestion : résumé hebdomadaire automatique (temps travail / divertissement, tâches terminées, avancement des cours).
